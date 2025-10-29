@@ -1,9 +1,0 @@
-,best_formation_energy,best_formation_energy,best_formation_energy,best_energy_above_hull,best_energy_above_hull,best_energy_above_hull,stable_compounds_count,stable_compounds_count,stable_compounds_count,compounds_explored,compounds_explored
-,mean,std,min,mean,std,min,mean,std,max,mean,std
-eh_weight,,,,,,,,,,,
-1.0,-0.7007,0.0,-0.7007,0.109,0.0,0.109,4.0,0.0,4,76.6,2.0736
-3.0,-0.1727,0.0,-0.1727,-0.0675,0.0,-0.0675,4.0,0.0,4,66.4,2.7019
-5.0,-0.1727,0.0,-0.1727,-0.0675,0.0,-0.0675,4.0,0.0,4,65.4,1.5166
-7.0,-0.1727,0.0,-0.1727,-0.0675,0.0,-0.0675,4.0,0.0,4,66.2,2.5884
-10.0,-0.1727,0.0,-0.1727,-0.0675,0.0,-0.0675,4.0,0.0,4,65.8,2.7749
-15.0,-0.1727,0.0,-0.1727,-0.0675,0.0,-0.0675,4.0,0.0,4,63.8,1.6432
