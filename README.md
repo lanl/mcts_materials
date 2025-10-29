@@ -145,17 +145,17 @@ python run_mcts.py --iterations 1000 --f-block-mode full_f_block --rollout-metho
 - **`fe` (Formation Energy)**: Optimizes for lowest formation energy only
   - Best for finding thermodynamically stable compounds
   - Reward = -e_form
-  - **No API key required** ✓
+  - **No API key required**
 
 - **`eh` (Energy Above Hull)**: Optimizes for lowest energy above hull only
   - Best for finding compounds stable against decomposition
   - Reward = -e_above_hull
-  - **Requires Materials Project API key** 🔑
+  - **Requires Materials Project API key**
 
 - **`both`**: Simple mixture of both metrics
   - Uses fe for first rollout, eh for subsequent rollouts
   - Reward = -e_form - e_above_hull (unweighted)
-  - **Requires Materials Project API key** 🔑
+  - **Requires Materials Project API key**
 
 - **`weighted` (Recommended)**: Tunable weighted combination
   - Balances both metrics with adjustable weighting
@@ -163,7 +163,7 @@ python run_mcts.py --iterations 1000 --f-block-mode full_f_block --rollout-metho
   - Default α = 5.0 provides balanced optimization
   - Increase α to prioritize hull stability
   - Decrease α to prioritize formation energy
-  - **Requires Materials Project API key** 🔑
+  - **Requires Materials Project API key**
 
 ### Materials Project API Key
 
