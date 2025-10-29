@@ -1,0 +1,172 @@
+Metadata-Version: 2.1
+Name: mcts-crystal
+Version: 0.1.0
+Summary: Monte Carlo Tree Search for crystal structure optimization
+Home-page: https://github.com/example/mcts-crystal
+Author: Crystal MCTS Developer
+Author-email: developer@example.com
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Topic :: Scientific/Engineering :: Chemistry
+Classifier: Topic :: Scientific/Engineering :: Physics
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Provides-Extra: dev
+Provides-Extra: docs
+
+# MCTS Crystal Structure Optimization
+
+A Python package for discovering optimal crystal structures using Monte Carlo Tree Search (MCTS) with systematic chemical substitution.
+
+## Features
+
+- **Monte Carlo Tree Search**: Efficient exploration of chemical space using MCTS algorithm
+- **Chemical Substitution**: Systematic substitution of transition metals and Group IV elements
+- **Energy Evaluation**: Integration with MACE-MP machine learning potential for energy calculations
+- **Cached Calculations**: CSV-based caching system to avoid redundant calculations
+- **Comprehensive Analysis**: Built-in tools for analyzing search results and chemical trends
+- **Visualization**: Generate tree expansion plots and energy distribution visualizations
+- **Formation Energy Focus**: Optimized for finding compounds with low formation energies
+
+## Installation
+
+### From Source
+
+```bash
+git clone https://github.com/example/mcts-crystal.git
+cd mcts-crystal
+pip install -e .
+```
+
+### Dependencies
+
+The package requires several scientific Python libraries:
+- NumPy, Pandas, Matplotlib for data handling and visualization
+- ASE (Atomic Simulation Environment) for crystal structure manipulation
+- MACE-torch for machine learning potential calculations
+- PyMatGen for materials science computations
+- NetworkX for tree visualization
+
+## Quick Start
+
+```python
+from mcts_crystal import MCTSTreeNode, MCTS, MaceEnergyCalculator
+from ase.io import read
+
+# Load initial crystal structure
+atoms = read("initial_structure.cif")
+
+# Set up energy calculator with cached results
+energy_calc = MaceEnergyCalculator(csv_file="mace_calculations.csv")
+
+# Initialize MCTS
+root = MCTSTreeNode(atoms)
+mcts = MCTS(root)
+
+# Run optimization
+results = mcts.run(
+    n_iterations=100,
+    energy_calculator=energy_calc,
+    rollout_depth=1,
+    n_rollout=10
+)
+
+print(f"Best compound: {results['best_node_formula']}")
+print(f"Formation energy: {results['best_node_e_form']:.4f} eV/atom")
+```
+
+## Example Usage
+
+See `examples/run_mcts_example.py` for a complete workflow demonstration:
+
+```bash
+cd examples
+python run_mcts_example.py
+```
+
+This will:
+1. Load or create an example crystal structure
+2. Run MCTS optimization for 20 iterations
+3. Generate visualization plots
+4. Create analysis reports
+5. Export detailed results
+
+## Package Structure
+
+```
+mcts_crystal/
+├── __init__.py          # Package initialization
+├── node.py              # MCTSTreeNode class
+├── mcts.py              # MCTS algorithm implementation
+├── energy_calculator.py # Energy calculations with MACE
+├── visualization.py     # Plotting and visualization tools
+└── analysis.py          # Results analysis tools
+```
+
+## Key Classes
+
+- **MCTSTreeNode**: Represents crystal structures as tree nodes with substitution capabilities
+- **MCTS**: Main algorithm class for running the optimization
+- **MaceEnergyCalculator**: Energy evaluation using MACE-MP with CSV caching
+- **TreeVisualizer**: Generate plots of tree expansion, energy distributions, and radial tree visualizations
+- **ResultsAnalyzer**: Analyze results and generate reports
+
+## Chemical Space Exploration
+
+The package focuses on exploring compounds with the formula M₆X₆U, where:
+- M is a transition metal (Ti-Zn, Zr-Cd, Hf-Hg)
+- X is a Group IV element (Si, Ge, Sn, Pb)
+- R is a f-block element excluding all actinides except for U
+
+The MCTS algorithm systematically explores substitutions while maintaining the original crystal structure framework.
+
+## Energy Calculations
+
+Energy evaluations use:
+1. **Cached lookups**: Check CSV file for previously calculated compounds
+2. **MACE-MP calculations**: Use machine learning potential for new compounds
+3. **Structure optimization**: Relax crystal structures before energy evaluation
+4. **Formation energy**: Calculate formation energy per atom
+5. **Thermodynamic stability**: Optional energy above convex hull calculations
+
+## Output and Analysis
+
+The package generates:
+- **Top compound lists**: Ranked by formation energy or stability
+- **Search statistics**: Efficiency metrics and exploration coverage
+- **Visualization plots**: Tree expansion, energy distributions, radial tree views with formation energy coloring
+- **Summary reports**: Comprehensive analysis of results
+- **Export files**: CSV files with detailed compound data
+
+## Testing
+
+Run the test suite:
+
+```bash
+cd tests
+python test_mcts_crystal.py
+```
+
+## License
+
+This project is licensed under the MIT License.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit pull requests or open issues for bugs and feature requests.
+
+## Citation
+
+If you use this package in your research, please cite:
+
+```
+
+```

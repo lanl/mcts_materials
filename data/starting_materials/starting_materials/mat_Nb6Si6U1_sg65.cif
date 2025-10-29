@@ -1,0 +1,63 @@
+# generated using pymatgen
+data_U(NbSi)6
+_symmetry_space_group_name_H-M   Cmmm
+_cell_length_a   5.57234395
+_cell_length_b   48.16555262
+_cell_length_c   8.62024190
+_cell_angle_alpha   90.00000000
+_cell_angle_beta   90.00000000
+_cell_angle_gamma   90.00000000
+_symmetry_Int_Tables_number   65
+_chemical_formula_structural   U(NbSi)6
+_chemical_formula_sum   'U10 Nb60 Si60'
+_cell_volume   2313.63004618
+_cell_formula_units_Z   10
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+  2  '-x, -y, -z'
+  3  '-x, -y, z'
+  4  'x, y, -z'
+  5  'x, -y, -z'
+  6  '-x, y, z'
+  7  '-x, y, -z'
+  8  'x, -y, z'
+  9  'x+1/2, y+1/2, z'
+  10  '-x+1/2, -y+1/2, -z'
+  11  '-x+1/2, -y+1/2, z'
+  12  'x+1/2, y+1/2, -z'
+  13  'x+1/2, -y+1/2, -z'
+  14  '-x+1/2, y+1/2, z'
+  15  '-x+1/2, y+1/2, -z'
+  16  'x+1/2, -y+1/2, z'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  U  U0  4  0.00000000  0.20045836  0.50000000  1
+  U  U1  4  0.00000000  0.40046910  0.00000000  1
+  U  U2  2  0.00000000  0.00000000  0.00000000  1
+  Nb  Nb3  16  0.24978108  0.04993326  0.24855592  1
+  Nb  Nb4  16  0.24999809  0.14999527  0.25003647  1
+  Nb  Nb5  8  0.00000000  0.09995409  0.25671861  1
+  Nb  Nb6  8  0.00000000  0.29996704  0.24292436  1
+  Nb  Nb7  8  0.25000000  0.25000000  0.25255519  1
+  Nb  Nb8  4  0.00000000  0.50000000  0.24983739  1
+  Si  Si9  8  0.00000000  0.20026937  0.16338670  1
+  Si  Si10  8  0.00000000  0.40027325  0.33659069  1
+  Si  Si11  4  0.00000000  0.00000000  0.33648553  1
+  Si  Si12  4  0.00000000  0.06573863  0.50000000  1
+  Si  Si13  4  0.00000000  0.06792339  0.00000000  1
+  Si  Si14  4  0.00000000  0.13035764  0.00000000  1
+  Si  Si15  4  0.00000000  0.13567884  0.50000000  1
+  Si  Si16  4  0.00000000  0.26548596  0.00000000  1
+  Si  Si17  4  0.00000000  0.26821101  0.50000000  1
+  Si  Si18  4  0.00000000  0.33032693  0.50000000  1
+  Si  Si19  4  0.00000000  0.33572549  0.00000000  1
+  Si  Si20  4  0.00000000  0.46660256  0.50000000  1
+  Si  Si21  4  0.00000000  0.46708125  0.00000000  1

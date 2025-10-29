@@ -1,0 +1,2 @@
+[console_scripts]
+mcts-crystal = mcts_crystal.cli:main

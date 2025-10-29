@@ -1,0 +1,55 @@
+# generated using pymatgen
+data_U(NbPb)6
+_symmetry_space_group_name_H-M   Immm
+_cell_length_a   5.80875011
+_cell_length_b   10.16066553
+_cell_length_c   30.21375547
+_cell_angle_alpha   90.00000000
+_cell_angle_beta   90.00000000
+_cell_angle_gamma   90.00000000
+_symmetry_Int_Tables_number   71
+_chemical_formula_structural   U(NbPb)6
+_chemical_formula_sum   'U6 Nb36 Pb36'
+_cell_volume   1783.23902102
+_cell_formula_units_Z   6
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+  2  '-x, -y, -z'
+  3  '-x, -y, z'
+  4  'x, y, -z'
+  5  'x, -y, -z'
+  6  '-x, y, z'
+  7  '-x, y, -z'
+  8  'x, -y, z'
+  9  'x+1/2, y+1/2, z+1/2'
+  10  '-x+1/2, -y+1/2, -z+1/2'
+  11  '-x+1/2, -y+1/2, z+1/2'
+  12  'x+1/2, y+1/2, -z+1/2'
+  13  'x+1/2, -y+1/2, -z+1/2'
+  14  '-x+1/2, y+1/2, z+1/2'
+  15  '-x+1/2, y+1/2, -z+1/2'
+  16  'x+1/2, -y+1/2, z+1/2'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  U  U0  4  0.00000000  0.50000000  0.33245520  1
+  U  U1  2  0.00000000  0.00000000  0.00000000  1
+  Nb  Nb2  16  0.24939535  0.24240285  0.08319823  1
+  Nb  Nb3  8  0.00000000  0.24307167  0.16684784  1
+  Nb  Nb4  8  0.25000000  0.25000000  0.25000000  1
+  Nb  Nb5  4  0.00000000  0.25754245  0.50000000  1
+  Pb  Pb6  8  0.00000000  0.17053593  0.33391271  1
+  Pb  Pb7  4  0.00000000  0.00000000  0.11173697  1
+  Pb  Pb8  4  0.00000000  0.00000000  0.22252553  1
+  Pb  Pb9  4  0.00000000  0.00000000  0.44435584  1
+  Pb  Pb10  4  0.00000000  0.32936716  0.00000000  1
+  Pb  Pb11  4  0.00000000  0.50000000  0.11045638  1
+  Pb  Pb12  4  0.00000000  0.50000000  0.22214384  1
+  Pb  Pb13  4  0.00000000  0.50000000  0.44427596  1

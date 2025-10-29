@@ -1,0 +1,55 @@
+# generated using pymatgen
+data_U(SiHg)6
+_symmetry_space_group_name_H-M   Immm
+_cell_length_a   6.18585173
+_cell_length_b   7.94211667
+_cell_length_c   33.05167251
+_cell_angle_alpha   90.00000000
+_cell_angle_beta   90.00000000
+_cell_angle_gamma   90.00000000
+_symmetry_Int_Tables_number   71
+_chemical_formula_structural   U(SiHg)6
+_chemical_formula_sum   'U6 Si36 Hg36'
+_cell_volume   1623.78755906
+_cell_formula_units_Z   6
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+  2  '-x, -y, -z'
+  3  '-x, -y, z'
+  4  'x, y, -z'
+  5  'x, -y, -z'
+  6  '-x, y, z'
+  7  '-x, y, -z'
+  8  'x, -y, z'
+  9  'x+1/2, y+1/2, z+1/2'
+  10  '-x+1/2, -y+1/2, -z+1/2'
+  11  '-x+1/2, -y+1/2, z+1/2'
+  12  'x+1/2, y+1/2, -z+1/2'
+  13  'x+1/2, -y+1/2, -z+1/2'
+  14  '-x+1/2, y+1/2, z+1/2'
+  15  '-x+1/2, y+1/2, -z+1/2'
+  16  'x+1/2, -y+1/2, z+1/2'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  U  U0  4  0.00000000  0.00000000  0.33424481  1
+  U  U1  2  0.00000000  0.50000000  0.00000000  1
+  Si  Si2  8  0.00000000  0.35094674  0.33329317  1
+  Si  Si3  4  0.00000000  0.00000000  0.10941496  1
+  Si  Si4  4  0.00000000  0.00000000  0.23856147  1
+  Si  Si5  4  0.00000000  0.00000000  0.44446632  1
+  Si  Si6  4  0.00000000  0.14835555  0.00000000  1
+  Si  Si7  4  0.00000000  0.50000000  0.11497830  1
+  Si  Si8  4  0.00000000  0.50000000  0.21085556  1
+  Si  Si9  4  0.00000000  0.50000000  0.44644988  1
+  Hg  Hg10  16  0.24835820  0.25466855  0.08272008  1
+  Hg  Hg11  8  0.00000000  0.23778668  0.16495135  1
+  Hg  Hg12  8  0.25000000  0.25000000  0.25000000  1
+  Hg  Hg13  4  0.00000000  0.24250639  0.50000000  1

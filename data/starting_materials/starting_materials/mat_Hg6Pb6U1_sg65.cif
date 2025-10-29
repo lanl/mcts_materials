@@ -1,0 +1,63 @@
+# generated using pymatgen
+data_U(HgPb)6
+_symmetry_space_group_name_H-M   Cmmm
+_cell_length_a   5.77719866
+_cell_length_b   50.17229029
+_cell_length_c   15.02437025
+_cell_angle_alpha   90.00000000
+_cell_angle_beta   90.00000000
+_cell_angle_gamma   90.00000000
+_symmetry_Int_Tables_number   65
+_chemical_formula_structural   U(HgPb)6
+_chemical_formula_sum   'U10 Hg60 Pb60'
+_cell_volume   4354.89316930
+_cell_formula_units_Z   10
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+  2  '-x, -y, -z'
+  3  '-x, -y, z'
+  4  'x, y, -z'
+  5  'x, -y, -z'
+  6  '-x, y, z'
+  7  '-x, y, -z'
+  8  'x, -y, z'
+  9  'x+1/2, y+1/2, z'
+  10  '-x+1/2, -y+1/2, -z'
+  11  '-x+1/2, -y+1/2, z'
+  12  'x+1/2, y+1/2, -z'
+  13  'x+1/2, -y+1/2, -z'
+  14  '-x+1/2, y+1/2, z'
+  15  '-x+1/2, y+1/2, -z'
+  16  'x+1/2, -y+1/2, z'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  U  U0  4  0.00000000  0.20102138  0.00000000  1
+  U  U1  4  0.00000000  0.40108884  0.50000000  1
+  U  U2  2  0.00000000  0.00000000  0.50000000  1
+  Hg  Hg3  16  0.24992809  0.04999832  0.24126974  1
+  Hg  Hg4  16  0.24999478  0.35000537  0.25003311  1
+  Hg  Hg5  8  0.00000000  0.10006929  0.23894479  1
+  Hg  Hg6  8  0.00000000  0.30007602  0.26107794  1
+  Hg  Hg7  8  0.25000000  0.25000000  0.25947335  1
+  Hg  Hg8  4  0.00000000  0.50000000  0.24189016  1
+  Pb  Pb9  8  0.00000000  0.19979435  0.39453434  1
+  Pb  Pb10  8  0.00000000  0.39981833  0.10551257  1
+  Pb  Pb11  4  0.00000000  0.00000000  0.10570468  1
+  Pb  Pb12  4  0.00000000  0.06646781  0.50000000  1
+  Pb  Pb13  4  0.00000000  0.06676931  0.00000000  1
+  Pb  Pb14  4  0.00000000  0.13199117  0.50000000  1
+  Pb  Pb15  4  0.00000000  0.13465017  0.00000000  1
+  Pb  Pb16  4  0.00000000  0.26662644  0.50000000  1
+  Pb  Pb17  4  0.00000000  0.26686792  0.00000000  1
+  Pb  Pb18  4  0.00000000  0.33205541  0.00000000  1
+  Pb  Pb19  4  0.00000000  0.33468873  0.50000000  1
+  Pb  Pb20  4  0.00000000  0.46670084  0.00000000  1
+  Pb  Pb21  4  0.00000000  0.46707053  0.50000000  1

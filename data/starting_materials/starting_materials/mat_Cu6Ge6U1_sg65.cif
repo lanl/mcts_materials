@@ -1,0 +1,63 @@
+# generated using pymatgen
+data_U(CuGe)6
+_symmetry_space_group_name_H-M   Cmmm
+_cell_length_a   5.25253083
+_cell_length_b   45.45879089
+_cell_length_c   8.53568652
+_cell_angle_alpha   90.00000000
+_cell_angle_beta   90.00000000
+_cell_angle_gamma   90.00000000
+_symmetry_Int_Tables_number   65
+_chemical_formula_structural   U(CuGe)6
+_chemical_formula_sum   'U10 Cu60 Ge60'
+_cell_volume   2038.09745997
+_cell_formula_units_Z   10
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+  2  '-x, -y, -z'
+  3  '-x, -y, z'
+  4  'x, y, -z'
+  5  'x, -y, -z'
+  6  '-x, y, z'
+  7  '-x, y, -z'
+  8  'x, -y, z'
+  9  'x+1/2, y+1/2, z'
+  10  '-x+1/2, -y+1/2, -z'
+  11  '-x+1/2, -y+1/2, z'
+  12  'x+1/2, y+1/2, -z'
+  13  'x+1/2, -y+1/2, -z'
+  14  '-x+1/2, y+1/2, z'
+  15  '-x+1/2, y+1/2, -z'
+  16  'x+1/2, -y+1/2, z'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  U  U0  4  0.00000000  0.19949618  0.00000000  1
+  U  U1  4  0.00000000  0.39943743  0.50000000  1
+  U  U2  2  0.00000000  0.00000000  0.50000000  1
+  Cu  Cu3  16  0.24985392  0.04996267  0.25067517  1
+  Cu  Cu4  16  0.24997595  0.35000108  0.24999353  1
+  Cu  Cu5  8  0.00000000  0.09994236  0.25097401  1
+  Cu  Cu6  8  0.00000000  0.29993302  0.24903195  1
+  Cu  Cu7  8  0.25000000  0.25000000  0.24904180  1
+  Cu  Cu8  4  0.00000000  0.50000000  0.25037143  1
+  Ge  Ge9  8  0.00000000  0.20053612  0.34781598  1
+  Ge  Ge10  8  0.00000000  0.40058871  0.15219483  1
+  Ge  Ge11  4  0.00000000  0.00000000  0.15190061  1
+  Ge  Ge12  4  0.00000000  0.06692511  0.00000000  1
+  Ge  Ge13  4  0.00000000  0.06708943  0.50000000  1
+  Ge  Ge14  4  0.00000000  0.13317165  0.50000000  1
+  Ge  Ge15  4  0.00000000  0.13343889  0.00000000  1
+  Ge  Ge16  4  0.00000000  0.26684797  0.50000000  1
+  Ge  Ge17  4  0.00000000  0.26702110  0.00000000  1
+  Ge  Ge18  4  0.00000000  0.33314017  0.00000000  1
+  Ge  Ge19  4  0.00000000  0.33342690  0.50000000  1
+  Ge  Ge20  4  0.00000000  0.46669049  0.50000000  1
+  Ge  Ge21  4  0.00000000  0.46682463  0.00000000  1

@@ -1,0 +1,63 @@
+# generated using pymatgen
+data_Hf6USn6
+_symmetry_space_group_name_H-M   Cmmm
+_cell_length_a   6.03445555
+_cell_length_b   52.29937616
+_cell_length_c   9.89008436
+_cell_angle_alpha   90.00000000
+_cell_angle_beta   90.00000000
+_cell_angle_gamma   90.00000000
+_symmetry_Int_Tables_number   65
+_chemical_formula_structural   Hf6USn6
+_chemical_formula_sum   'Hf60 U10 Sn60'
+_cell_volume   3121.29342058
+_cell_formula_units_Z   10
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+  2  '-x, -y, -z'
+  3  '-x, -y, z'
+  4  'x, y, -z'
+  5  'x, -y, -z'
+  6  '-x, y, z'
+  7  '-x, y, -z'
+  8  'x, -y, z'
+  9  'x+1/2, y+1/2, z'
+  10  '-x+1/2, -y+1/2, -z'
+  11  '-x+1/2, -y+1/2, z'
+  12  'x+1/2, y+1/2, -z'
+  13  'x+1/2, -y+1/2, -z'
+  14  '-x+1/2, y+1/2, z'
+  15  '-x+1/2, y+1/2, -z'
+  16  'x+1/2, -y+1/2, z'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  Hf  Hf0  16  0.24980530  0.05000267  0.24721929  1
+  Hf  Hf1  16  0.24999489  0.14999716  0.25000127  1
+  Hf  Hf2  8  0.00000000  0.20009837  0.25030125  1
+  Hf  Hf3  8  0.00000000  0.40010689  0.24972435  1
+  Hf  Hf4  8  0.25000000  0.25000000  0.25277299  1
+  Hf  Hf5  4  0.00000000  0.00000000  0.24721514  1
+  U  U6  4  0.00000000  0.09990396  0.00000000  1
+  U  U7  4  0.00000000  0.29990813  0.50000000  1
+  U  U8  2  0.00000000  0.50000000  0.00000000  1
+  Sn  Sn9  8  0.00000000  0.10010562  0.31199773  1
+  Sn  Sn10  8  0.00000000  0.30011628  0.18801108  1
+  Sn  Sn11  4  0.00000000  0.03322129  0.50000000  1
+  Sn  Sn12  4  0.00000000  0.03331840  0.00000000  1
+  Sn  Sn13  4  0.00000000  0.16437048  0.00000000  1
+  Sn  Sn14  4  0.00000000  0.16861537  0.50000000  1
+  Sn  Sn15  4  0.00000000  0.23326284  0.00000000  1
+  Sn  Sn16  4  0.00000000  0.23331346  0.50000000  1
+  Sn  Sn17  4  0.00000000  0.36437170  0.50000000  1
+  Sn  Sn18  4  0.00000000  0.36861749  0.00000000  1
+  Sn  Sn19  4  0.00000000  0.43330880  0.00000000  1
+  Sn  Sn20  4  0.00000000  0.43330991  0.50000000  1
+  Sn  Sn21  4  0.00000000  0.50000000  0.31183106  1

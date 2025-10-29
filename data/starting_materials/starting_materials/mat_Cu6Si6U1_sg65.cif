@@ -1,0 +1,63 @@
+# generated using pymatgen
+data_U(CuSi)6
+_symmetry_space_group_name_H-M   Cmmm
+_cell_length_a   5.05544520
+_cell_length_b   43.71986984
+_cell_length_c   8.03241808
+_cell_angle_alpha   90.00000000
+_cell_angle_beta   90.00000000
+_cell_angle_gamma   90.00000000
+_symmetry_Int_Tables_number   65
+_chemical_formula_structural   U(CuSi)6
+_chemical_formula_sum   'U10 Cu60 Si60'
+_cell_volume   1775.35240405
+_cell_formula_units_Z   10
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+  2  '-x, -y, -z'
+  3  '-x, -y, z'
+  4  'x, y, -z'
+  5  'x, -y, -z'
+  6  '-x, y, z'
+  7  '-x, y, -z'
+  8  'x, -y, z'
+  9  'x+1/2, y+1/2, z'
+  10  '-x+1/2, -y+1/2, -z'
+  11  '-x+1/2, -y+1/2, z'
+  12  'x+1/2, y+1/2, -z'
+  13  'x+1/2, -y+1/2, -z'
+  14  '-x+1/2, y+1/2, z'
+  15  '-x+1/2, y+1/2, -z'
+  16  'x+1/2, -y+1/2, z'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  U  U0  4  0.00000000  0.19967125  0.50000000  1
+  U  U1  4  0.00000000  0.39963631  0.00000000  1
+  U  U2  2  0.00000000  0.00000000  0.00000000  1
+  Cu  Cu3  16  0.24981056  0.44997934  0.26261415  1
+  Cu  Cu4  16  0.24998426  0.15000253  0.24999137  1
+  Cu  Cu5  8  0.00000000  0.09994120  0.25967102  1
+  Si  Si6  8  0.00000000  0.20018287  0.14605156  1
+  Cu  Cu7  8  0.00000000  0.29994242  0.24041804  1
+  Si  Si8  8  0.00000000  0.40022780  0.35402825  1
+  Cu  Cu9  8  0.25000000  0.25000000  0.23722547  1
+  Si  Si10  4  0.00000000  0.00000000  0.35440839  1
+  Si  Si11  4  0.00000000  0.06667108  0.50000000  1
+  Si  Si12  4  0.00000000  0.06683496  0.00000000  1
+  Si  Si13  4  0.00000000  0.13313242  0.00000000  1
+  Si  Si14  4  0.00000000  0.13329582  0.50000000  1
+  Si  Si15  4  0.00000000  0.26668019  0.50000000  1
+  Si  Si16  4  0.00000000  0.26680663  0.00000000  1
+  Si  Si17  4  0.00000000  0.33313754  0.50000000  1
+  Si  Si18  4  0.00000000  0.33329010  0.00000000  1
+  Si  Si19  4  0.00000000  0.46662020  0.00000000  1
+  Si  Si20  4  0.00000000  0.46698497  0.50000000  1
+  Cu  Cu21  4  0.00000000  0.50000000  0.26222622  1

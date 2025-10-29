@@ -1,0 +1,39 @@
+================================================================================
+MCTS CRYSTAL STRUCTURE OPTIMIZATION REPORT
+================================================================================
+
+SEARCH SUMMARY:
+- Root compound: Pb6UW6
+- Total iterations: 906
+- Unique compounds explored: 82
+- Search terminated: True
+
+BEST RESULTS:
+- Best formation energy: -0.7007 eV/atom
+- Best energy above hull: -0.0675 eV/atom
+- Best compound: Rh6Si6U
+
+SEARCH EFFICIENCY:
+- Compounds within 100 meV of hull: 35
+- Compounds within 50 meV of hull: 20
+- Average visits per compound: 11.05
+- Search diversity: 0.0905
+
+CHEMICAL TRENDS:
+- Most common transition metal: Ti
+- Most common Group IV element: Ge
+
+TOP 10 COMPOUNDS BY FORMATION ENERGY:
+--------------------------------------------------
+ 1. Rh6Si6U         | E_form:  -0.7007 eV/atom | E_hull:   0.1090 eV/atom | Visits:   35
+ 2. Ir6Si6U         | E_form:  -0.5980 eV/atom | E_hull:   0.1405 eV/atom | Visits:   15
+ 3. Ru6Si6U         | E_form:  -0.5099 eV/atom | E_hull:   0.1456 eV/atom | Visits:   21
+ 4. Pd6Si6U         | E_form:  -0.5025 eV/atom | E_hull:   0.0778 eV/atom | Visits:    7
+ 5. Pt6Si6U         | E_form:  -0.4924 eV/atom | E_hull:   0.2191 eV/atom | Visits:    5
+ 6. Ge6Rh6U         | E_form:  -0.4907 eV/atom | E_hull:   0.0501 eV/atom | Visits:   10
+ 7. Ge6Ti6U         | E_form:  -0.4907 eV/atom | E_hull:   0.1171 eV/atom | Visits:   23
+ 8. Co6Si6U         | E_form:  -0.4881 eV/atom | E_hull:   0.0841 eV/atom | Visits:    5
+ 9. Ni6Si6U         | E_form:  -0.4768 eV/atom | E_hull:   0.0611 eV/atom | Visits:    1
+10. Ge6UZr6         | E_form:  -0.4553 eV/atom | E_hull:   0.3016 eV/atom | Visits:   27
+
+================================================================================

@@ -1,0 +1,6 @@
+,best_formation_energy,best_formation_energy,best_formation_energy,best_energy_above_hull,best_energy_above_hull,best_energy_above_hull,compounds_explored,compounds_explored,compounds_near_hull_100meV,compounds_near_hull_100meV,compounds_near_hull_100meV
+,mean,std,min,mean,std,min,mean,std,mean,std,max
+rollout_method,,,,,,,,,,,
+both,-0.7007,0.0,-0.7007,0.109,0.0,0.109,76.8,4.341,33.5,1.5811,35
+eh,-0.1727,0.0,-0.1727,-0.0675,0.0,-0.0675,60.4,2.2706,24.6,1.5055,26
+fe,-0.7007,0.0,-0.7007,0.109,0.0,0.109,78.6,3.4059,33.0,1.633,35

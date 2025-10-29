@@ -1,0 +1,55 @@
+# generated using pymatgen
+data_U(ZnPb)6
+_symmetry_space_group_name_H-M   Immm
+_cell_length_a   5.59226631
+_cell_length_b   10.83549944
+_cell_length_c   29.82666331
+_cell_angle_alpha   90.00000000
+_cell_angle_beta   90.00000000
+_cell_angle_gamma   90.00000000
+_symmetry_Int_Tables_number   71
+_chemical_formula_structural   U(ZnPb)6
+_chemical_formula_sum   'U6 Zn36 Pb36'
+_cell_volume   1807.34661762
+_cell_formula_units_Z   6
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+  2  '-x, -y, -z'
+  3  '-x, -y, z'
+  4  'x, y, -z'
+  5  'x, -y, -z'
+  6  '-x, y, z'
+  7  '-x, y, -z'
+  8  'x, -y, z'
+  9  'x+1/2, y+1/2, z+1/2'
+  10  '-x+1/2, -y+1/2, -z+1/2'
+  11  '-x+1/2, -y+1/2, z+1/2'
+  12  'x+1/2, y+1/2, -z+1/2'
+  13  'x+1/2, -y+1/2, -z+1/2'
+  14  '-x+1/2, y+1/2, z+1/2'
+  15  '-x+1/2, y+1/2, -z+1/2'
+  16  'x+1/2, -y+1/2, z+1/2'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  U  U0  4  0.00000000  0.00000000  0.17267289  1
+  U  U1  2  0.00000000  0.50000000  0.50000000  1
+  Zn  Zn2  16  0.23407526  0.28687926  0.42164688  1
+  Zn  Zn3  8  0.00000000  0.29857764  0.32509398  1
+  Zn  Zn4  8  0.25000000  0.25000000  0.25000000  1
+  Zn  Zn5  4  0.00000000  0.20757380  0.00000000  1
+  Pb  Pb6  8  0.00000000  0.30587950  0.16200789  1
+  Pb  Pb7  4  0.00000000  0.00000000  0.05878622  1
+  Pb  Pb8  4  0.00000000  0.00000000  0.28359942  1
+  Pb  Pb9  4  0.00000000  0.00000000  0.39177013  1
+  Pb  Pb10  4  0.00000000  0.18304301  0.50000000  1
+  Pb  Pb11  4  0.00000000  0.50000000  0.05528538  1
+  Pb  Pb12  4  0.00000000  0.50000000  0.26756709  1
+  Pb  Pb13  4  0.00000000  0.50000000  0.38598770  1

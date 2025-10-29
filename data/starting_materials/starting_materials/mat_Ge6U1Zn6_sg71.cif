@@ -1,0 +1,55 @@
+# generated using pymatgen
+data_U(ZnGe)6
+_symmetry_space_group_name_H-M   Immm
+_cell_length_a   5.19983324
+_cell_length_b   8.53066799
+_cell_length_c   30.48903063
+_cell_angle_alpha   90.00000000
+_cell_angle_beta   90.00000000
+_cell_angle_gamma   90.00000000
+_symmetry_Int_Tables_number   71
+_chemical_formula_structural   U(ZnGe)6
+_chemical_formula_sum   'U6 Zn36 Ge36'
+_cell_volume   1352.43397492
+_cell_formula_units_Z   6
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+  2  '-x, -y, -z'
+  3  '-x, -y, z'
+  4  'x, y, -z'
+  5  'x, -y, -z'
+  6  '-x, y, z'
+  7  '-x, y, -z'
+  8  'x, -y, z'
+  9  'x+1/2, y+1/2, z+1/2'
+  10  '-x+1/2, -y+1/2, -z+1/2'
+  11  '-x+1/2, -y+1/2, z+1/2'
+  12  'x+1/2, y+1/2, -z+1/2'
+  13  'x+1/2, -y+1/2, -z+1/2'
+  14  '-x+1/2, y+1/2, z+1/2'
+  15  '-x+1/2, y+1/2, -z+1/2'
+  16  'x+1/2, -y+1/2, z+1/2'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  U  U0  4  0.00000000  0.00000000  0.33869058  1
+  U  U1  2  0.00000000  0.50000000  0.00000000  1
+  Zn  Zn2  16  0.24857447  0.26530135  0.08160915  1
+  Zn  Zn3  8  0.00000000  0.25689762  0.16589585  1
+  Zn  Zn4  8  0.25000000  0.25000000  0.25000000  1
+  Zn  Zn5  4  0.00000000  0.24027590  0.50000000  1
+  Ge  Ge6  8  0.00000000  0.35788513  0.33571157  1
+  Ge  Ge7  4  0.00000000  0.00000000  0.10902065  1
+  Ge  Ge8  4  0.00000000  0.00000000  0.24213682  1
+  Ge  Ge9  4  0.00000000  0.00000000  0.44799939  1
+  Ge  Ge10  4  0.00000000  0.14241521  0.00000000  1
+  Ge  Ge11  4  0.00000000  0.50000000  0.11053322  1
+  Ge  Ge12  4  0.00000000  0.50000000  0.21397423  1
+  Ge  Ge13  4  0.00000000  0.50000000  0.42760528  1

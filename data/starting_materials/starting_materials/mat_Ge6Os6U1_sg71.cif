@@ -1,0 +1,55 @@
+# generated using pymatgen
+data_U(GeOs)6
+_symmetry_space_group_name_H-M   Immm
+_cell_length_a   5.45816419
+_cell_length_b   8.10272692
+_cell_length_c   28.34510878
+_cell_angle_alpha   90.00000000
+_cell_angle_beta   90.00000000
+_cell_angle_gamma   90.00000000
+_symmetry_Int_Tables_number   71
+_chemical_formula_structural   U(GeOs)6
+_chemical_formula_sum   'U6 Ge36 Os36'
+_cell_volume   1253.59117432
+_cell_formula_units_Z   6
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+  2  '-x, -y, -z'
+  3  '-x, -y, z'
+  4  'x, y, -z'
+  5  'x, -y, -z'
+  6  '-x, y, z'
+  7  '-x, y, -z'
+  8  'x, -y, z'
+  9  'x+1/2, y+1/2, z+1/2'
+  10  '-x+1/2, -y+1/2, -z+1/2'
+  11  '-x+1/2, -y+1/2, z+1/2'
+  12  'x+1/2, y+1/2, -z+1/2'
+  13  'x+1/2, -y+1/2, -z+1/2'
+  14  '-x+1/2, y+1/2, z+1/2'
+  15  '-x+1/2, y+1/2, -z+1/2'
+  16  'x+1/2, -y+1/2, z+1/2'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  U  U0  4  0.00000000  0.00000000  0.16722950  1
+  U  U1  2  0.00000000  0.50000000  0.50000000  1
+  Ge  Ge2  8  0.00000000  0.34096380  0.16677576  1
+  Ge  Ge3  4  0.00000000  0.00000000  0.05576992  1
+  Ge  Ge4  4  0.00000000  0.00000000  0.27719668  1
+  Ge  Ge5  4  0.00000000  0.00000000  0.38934579  1
+  Ge  Ge6  4  0.00000000  0.15913663  0.50000000  1
+  Ge  Ge7  4  0.00000000  0.50000000  0.05581192  1
+  Ge  Ge8  4  0.00000000  0.50000000  0.27855760  1
+  Ge  Ge9  4  0.00000000  0.50000000  0.38834438  1
+  Os  Os10  16  0.24976588  0.25246777  0.41676284  1
+  Os  Os11  8  0.00000000  0.24803116  0.33342216  1
+  Os  Os12  8  0.25000000  0.25000000  0.25000000  1
+  Os  Os13  4  0.00000000  0.24803491  0.00000000  1

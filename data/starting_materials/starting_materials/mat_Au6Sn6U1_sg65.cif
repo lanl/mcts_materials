@@ -1,0 +1,63 @@
+# generated using pymatgen
+data_U(SnAu)6
+_symmetry_space_group_name_H-M   Cmmm
+_cell_length_a   5.84841715
+_cell_length_b   51.06967130
+_cell_length_c   9.66432516
+_cell_angle_alpha   90.00000000
+_cell_angle_beta   90.00000000
+_cell_angle_gamma   90.00000000
+_symmetry_Int_Tables_number   65
+_chemical_formula_structural   U(SnAu)6
+_chemical_formula_sum   'U10 Sn60 Au60'
+_cell_volume   2886.50914542
+_cell_formula_units_Z   10
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+  2  '-x, -y, -z'
+  3  '-x, -y, z'
+  4  'x, y, -z'
+  5  'x, -y, -z'
+  6  '-x, y, z'
+  7  '-x, y, -z'
+  8  'x, -y, z'
+  9  'x+1/2, y+1/2, z'
+  10  '-x+1/2, -y+1/2, -z'
+  11  '-x+1/2, -y+1/2, z'
+  12  'x+1/2, y+1/2, -z'
+  13  'x+1/2, -y+1/2, -z'
+  14  '-x+1/2, y+1/2, z'
+  15  '-x+1/2, y+1/2, -z'
+  16  'x+1/2, -y+1/2, z'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  U  U0  4  0.00000000  0.09921575  0.00000000  1
+  U  U1  4  0.00000000  0.29926613  0.50000000  1
+  U  U2  2  0.00000000  0.50000000  0.00000000  1
+  Sn  Sn3  8  0.00000000  0.10010253  0.33047098  1
+  Sn  Sn4  8  0.00000000  0.30009746  0.16948541  1
+  Sn  Sn5  4  0.00000000  0.03314496  0.50000000  1
+  Sn  Sn6  4  0.00000000  0.03318234  0.00000000  1
+  Sn  Sn7  4  0.00000000  0.16505785  0.00000000  1
+  Sn  Sn8  4  0.00000000  0.16829671  0.50000000  1
+  Sn  Sn9  4  0.00000000  0.23307818  0.00000000  1
+  Sn  Sn10  4  0.00000000  0.23333617  0.50000000  1
+  Sn  Sn11  4  0.00000000  0.36506057  0.50000000  1
+  Sn  Sn12  4  0.00000000  0.36830319  0.00000000  1
+  Sn  Sn13  4  0.00000000  0.43303302  0.50000000  1
+  Sn  Sn14  4  0.00000000  0.43343515  0.00000000  1
+  Sn  Sn15  4  0.00000000  0.50000000  0.32991588  1
+  Au  Au16  16  0.24975549  0.05002310  0.24233613  1
+  Au  Au17  16  0.24999109  0.65000159  0.24999689  1
+  Au  Au18  8  0.00000000  0.20005010  0.25731176  1
+  Au  Au19  8  0.00000000  0.40005555  0.24261700  1
+  Au  Au20  8  0.25000000  0.25000000  0.25756733  1
+  Au  Au21  4  0.00000000  0.00000000  0.24225208  1

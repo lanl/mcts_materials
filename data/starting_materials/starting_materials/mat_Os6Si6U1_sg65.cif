@@ -1,0 +1,63 @@
+# generated using pymatgen
+data_U(SiOs)6
+_symmetry_space_group_name_H-M   Cmmm
+_cell_length_a   5.35649199
+_cell_length_b   46.45954237
+_cell_length_c   7.89318803
+_cell_angle_alpha   90.00000000
+_cell_angle_beta   90.00000000
+_cell_angle_gamma   90.00000000
+_symmetry_Int_Tables_number   65
+_chemical_formula_structural   U(SiOs)6
+_chemical_formula_sum   'U10 Si60 Os60'
+_cell_volume   1964.30008858
+_cell_formula_units_Z   10
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+  2  '-x, -y, -z'
+  3  '-x, -y, z'
+  4  'x, y, -z'
+  5  'x, -y, -z'
+  6  '-x, y, z'
+  7  '-x, y, -z'
+  8  'x, -y, z'
+  9  'x+1/2, y+1/2, z'
+  10  '-x+1/2, -y+1/2, -z'
+  11  '-x+1/2, -y+1/2, z'
+  12  'x+1/2, y+1/2, -z'
+  13  'x+1/2, -y+1/2, -z'
+  14  '-x+1/2, y+1/2, z'
+  15  '-x+1/2, y+1/2, -z'
+  16  'x+1/2, -y+1/2, z'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  U  U0  4  0.00000000  0.10003173  0.00000000  1
+  U  U1  4  0.00000000  0.30002900  0.50000000  1
+  U  U2  2  0.00000000  0.50000000  0.00000000  1
+  Si  Si3  8  0.00000000  0.09997389  0.33752094  1
+  Si  Si4  8  0.00000000  0.29997351  0.16248335  1
+  Si  Si5  4  0.00000000  0.03308763  0.50000000  1
+  Si  Si6  4  0.00000000  0.03313825  0.00000000  1
+  Si  Si7  4  0.00000000  0.16654581  0.00000000  1
+  Si  Si8  4  0.00000000  0.16719311  0.50000000  1
+  Si  Si9  4  0.00000000  0.23308266  0.00000000  1
+  Si  Si10  4  0.00000000  0.23311023  0.50000000  1
+  Si  Si11  4  0.00000000  0.36654560  0.50000000  1
+  Si  Si12  4  0.00000000  0.36719308  0.00000000  1
+  Si  Si13  4  0.00000000  0.43307675  0.50000000  1
+  Si  Si14  4  0.00000000  0.43311268  0.00000000  1
+  Si  Si15  4  0.00000000  0.50000000  0.33789815  1
+  Os  Os16  16  0.24998179  0.05000857  0.25254080  1
+  Os  Os17  16  0.24999902  0.34999891  0.24999972  1
+  Os  Os18  8  0.00000000  0.20004673  0.24790807  1
+  Os  Os19  8  0.00000000  0.40004537  0.25208908  1
+  Os  Os20  8  0.25000000  0.25000000  0.24743372  1
+  Os  Os21  4  0.00000000  0.00000000  0.25271113  1
