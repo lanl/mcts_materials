@@ -95,7 +95,8 @@ class MCTS:
             
     def expansion_simulation(self, rollout_depth: int = 1, n_rollout: int = 1,
                            energy_calculator=None, rollout_method: str = 'both',
-                           alpha: float = 1.0, beta: float = 1.0) -> Tuple[float, bool]:
+                           alpha: float = 1.0, beta: float = 1.0, gamma: float = 0.0,
+                           doscar_lookup=None) -> Tuple[float, bool]:
         """
         Expand selected node and perform rollout simulation.
 
@@ -106,6 +107,8 @@ class MCTS:
             rollout_method: Rollout evaluation method ('fe', 'eh', 'both', or 'weighted')
             alpha: Weight for formation energy when using 'weighted' method (default: 1.0)
             beta: Weight for energy above hull when using 'weighted' method (default: 1.0)
+            gamma: Weight for DOSCAR reward when using 'weighted' method (default: 0.0)
+            doscar_lookup: DoscarRewardLookup instance for DOSCAR rewards
 
         Returns:
             Tuple of (reward, renew_t_to_terminate_flag)
@@ -162,14 +165,26 @@ class MCTS:
                 )
                 rewards.append((1 - 0.1 * rollout_depth) * rollout_reward)
         elif rollout_method == 'weighted':
-            # Weighted combination of formation energy and energy above hull
-            weighted_mode = f'weighted_{alpha}_{beta}'
-            rewards.append(new_node.rollout(depth=0, energy_calculator=energy_calculator, mode=weighted_mode))
+            # Weighted combination of formation energy, energy above hull, and DOSCAR reward
+            weighted_mode = f'weighted_{alpha}_{beta}_{gamma}'
+            rewards.append(new_node.rollout(depth=0, energy_calculator=energy_calculator, mode=weighted_mode, doscar_lookup=doscar_lookup))
             for _ in range(n_rollout - 1):
                 rollout_reward = new_node.rollout(
                     depth=rollout_depth,
                     energy_calculator=energy_calculator,
-                    mode=weighted_mode
+                    mode=weighted_mode,
+                    doscar_lookup=doscar_lookup
+                )
+                rewards.append((1 - 0.1 * rollout_depth) * rollout_reward)
+        elif rollout_method == 'dos':
+            # DOSCAR rewards only
+            rewards.append(new_node.rollout(depth=0, energy_calculator=energy_calculator, mode='dos', doscar_lookup=doscar_lookup))
+            for _ in range(n_rollout - 1):
+                rollout_reward = new_node.rollout(
+                    depth=rollout_depth,
+                    energy_calculator=energy_calculator,
+                    mode='dos',
+                    doscar_lookup=doscar_lookup
                 )
                 rewards.append((1 - 0.1 * rollout_depth) * rollout_reward)
         else:  # rollout_method == 'both'
@@ -246,7 +261,8 @@ class MCTS:
     def run(self, n_iterations: int, energy_calculator=None,
             rollout_depth: int = 1, n_rollout: int = 10,
             selection_mode: str = 'epsilon', rollout_method: str = 'both',
-            alpha: float = 1.0, beta: float = 1.0) -> Dict:
+            alpha: float = 1.0, beta: float = 1.0, gamma: float = 0.0,
+            doscar_lookup=None) -> Dict:
         """
         Run MCTS algorithm for specified number of iterations.
 
@@ -259,7 +275,9 @@ class MCTS:
             rollout_method: Rollout evaluation method ('fe', 'eh', 'both', or 'weighted')
             alpha: Weight for formation energy when using 'weighted' method (default: 1.0)
             beta: Weight for energy above hull when using 'weighted' method (default: 1.0)
-                  Reward = alpha*(-e_form) + beta*(-e_above_hull)
+            gamma: Weight for DOSCAR reward when using 'weighted' method (default: 0.0)
+            doscar_lookup: DoscarRewardLookup instance for DOSCAR rewards
+                  Reward = alpha*(-e_form) + beta*(-e_above_hull) + gamma*(doscar_reward)
 
         Returns:
             Dictionary containing run statistics
@@ -284,7 +302,9 @@ class MCTS:
                 energy_calculator=energy_calculator,
                 rollout_method=rollout_method,
                 alpha=alpha,
-                beta=beta
+                beta=beta,
+                gamma=gamma,
+                doscar_lookup=doscar_lookup
             )
             
             # Back-propagation

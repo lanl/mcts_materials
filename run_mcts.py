@@ -11,7 +11,8 @@ Examples:
     python run_mcts.py --structure my_structure.cif      # Custom structure
     python run_mcts.py --rollout-method fe               # Formation energy rollouts only
     python run_mcts.py --rollout-method eh               # Energy above hull rollouts only
-    python run_mcts.py --rollout-method weighted --alpha 2.0 --beta 3.0  # Custom weights
+    python run_mcts.py --rollout-method dos              # DOSCAR rewards only
+    python run_mcts.py --rollout-method weighted --alpha 2.0 --beta 3.0 --gamma 1.0  # Custom weights with DOSCAR
     python run_mcts.py --f-block-mode lanthanides_u      # Lanthanides + Uranium mode
     python run_mcts.py --exploration-constant 0.2        # Higher exploration (default: 0.1)
     python run_mcts.py --no-labels                       # Turn off labels on radial tree visualization
@@ -27,10 +28,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from mcts_crystal import (
     MCTSTreeNode,
-    MCTS, 
+    MCTS,
     MaceEnergyCalculator,
     TreeVisualizer,
-    ResultsAnalyzer
+    ResultsAnalyzer,
+    DoscarRewardLookup
 )
 from ase.io import read
 import pandas as pd
@@ -53,12 +55,14 @@ def main():
     parser.add_argument('--exploration-constant', '-c', type=float, default=0.1,
                        help='Exploration constant for UCB calculation (default: 0.1)')
     parser.add_argument('--rollout-method', type=str, default='weighted',
-                       choices=['fe', 'eh', 'both', 'weighted'],
-                       help='Rollout method: fe (formation energy), eh (energy above hull), both (mix of fe and eh), or weighted (tunable combination, default)')
+                       choices=['fe', 'eh', 'both', 'weighted', 'dos'],
+                       help='Rollout method: fe (formation energy), eh (energy above hull), both (mix of fe and eh), weighted (tunable combination, default), or dos (DOSCAR rewards only)')
     parser.add_argument('--alpha', type=float, default=1.0,
-                       help='Weight for formation energy in weighted rollout method (default: 1.0). Reward = alpha*(-e_form) + beta*(-e_above_hull)')
+                       help='Weight for formation energy in weighted rollout method (default: 1.0). Reward = alpha*(-e_form) + beta*(-e_above_hull) + gamma*(doscar_reward)')
     parser.add_argument('--beta', type=float, default=1.0,
-                       help='Weight for energy above hull in weighted rollout method (default: 1.0). Reward = alpha*(-e_form) + beta*(-e_above_hull)')
+                       help='Weight for energy above hull in weighted rollout method (default: 1.0). Reward = alpha*(-e_form) + beta*(-e_above_hull) + gamma*(doscar_reward)')
+    parser.add_argument('--gamma', type=float, default=0.0,
+                       help='Weight for DOSCAR reward in weighted rollout method (default: 0.0). Reward = alpha*(-e_form) + beta*(-e_above_hull) + gamma*(doscar_reward)')
     parser.add_argument('--mp-api-key', type=str, default=None,
                        help='Materials Project API key (required for rollout methods: eh, both, weighted)')
     parser.add_argument('--no-labels', action='store_true',
@@ -74,6 +78,15 @@ def main():
         print(f"   Get your API key from: https://materialsproject.org/api")
         print(f"   Then run with: --mp-api-key YOUR_KEY")
         return 1
+
+    # Check if DOSCAR rewards file exists for 'dos' method
+    if args.rollout_method == 'dos':
+        doscar_file = Path("doscar_rewards.csv")
+        if not doscar_file.exists():
+            print(f"❌ Error: doscar_rewards.csv not found for rollout method 'dos'")
+            print(f"   Please ensure doscar_rewards.csv is in the working directory")
+            print(f"   Run: python utils/calculate_doscar_rewards.py")
+            return 1
     
     print("=" * 80)
     print("MCTS CRYSTAL STRUCTURE OPTIMIZATION")
@@ -118,6 +131,21 @@ def main():
     except Exception as e:
         print(f"❌ Error setting up energy calculator: {e}")
         return 1
+
+    # Load DOSCAR rewards if gamma > 0 or using 'dos' rollout method
+    doscar_lookup = None
+    if args.gamma > 0 or args.rollout_method == 'dos':
+        print(f"\n2.5. Loading DOSCAR rewards...")
+        try:
+            doscar_lookup = DoscarRewardLookup()
+        except Exception as e:
+            print(f"❌ Error loading DOSCAR rewards: {e}")
+            if args.rollout_method == 'dos':
+                print(f"   Cannot continue without DOSCAR rewards for 'dos' method")
+                return 1
+            else:
+                print(f"   Continuing without DOSCAR rewards (gamma will be ignored)")
+                doscar_lookup = None
     
     # Step 3: Initialize MCTS
     print(f"\n3. Initializing MCTS algorithm...")
@@ -152,6 +180,7 @@ def main():
     if args.rollout_method == 'weighted':
         print(f"   Alpha (e_form weight): {args.alpha}")
         print(f"   Beta (e_above_hull weight): {args.beta}")
+        print(f"   Gamma (DOSCAR reward weight): {args.gamma}")
     print(f"   This may take several minutes depending on cache hit rate...")
 
     try:
@@ -163,7 +192,9 @@ def main():
             selection_mode='epsilon',
             rollout_method=args.rollout_method,
             alpha=args.alpha,
-            beta=args.beta
+            beta=args.beta,
+            gamma=args.gamma,
+            doscar_lookup=doscar_lookup
         )
         
         print(f"   ✓ Completed: {results['iterations_completed']} iterations")
@@ -338,7 +369,7 @@ def main():
     print(f"   python run_mcts.py --iterations 1000  # Longer search")
     print(f"   python run_mcts.py --structure my_file.cif  # Different starting material")
     print(f"   python run_mcts.py --f-block-mode lanthanides_u  # Lanthanides + U substitution")
-    print(f"   python run_mcts.py --alpha 2.0 --beta 3.0  # Custom reward weights")
+    print(f"   python run_mcts.py --alpha 2.0 --beta 3.0 --gamma 1.5  # Custom reward weights (include DOSCAR)")
     print(f"   python run_mcts.py -c 0.2  # Higher exploration constant")
     
     print("=" * 80)

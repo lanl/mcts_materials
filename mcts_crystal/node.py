@@ -257,15 +257,16 @@ class MCTSTreeNode:
         
         self.expansion_list = expansion_list
         
-    def rollout(self, depth: int = 1, energy_calculator=None, mode: str = 'fe') -> float:
+    def rollout(self, depth: int = 1, energy_calculator=None, mode: str = 'fe', doscar_lookup=None) -> float:
         """
         Perform rollout simulation from this node.
-        
+
         Args:
             depth: Number of random substitutions to perform
             energy_calculator: Energy calculator instance
-            mode: Evaluation mode ('fe' or 'eh' for energy above hull)
-            
+            mode: Evaluation mode ('fe', 'eh', 'both', or 'weighted_alpha_beta_gamma')
+            doscar_lookup: DoscarRewardLookup instance for DOSCAR rewards
+
         Returns:
             Reward value
         """
@@ -302,13 +303,22 @@ class MCTSTreeNode:
             tmp_atoms = tmp_atoms.copy()
             tmp_atoms.set_atomic_numbers(tmp_atoms.get_atomic_numbers() + op_mat)
         
+        if mode == 'dos':
+            # DOSCAR rewards only - no energy calculator needed
+            if doscar_lookup is not None:
+                formula = tmp_atoms.get_chemical_formula(mode='metal')
+                doscar_reward = doscar_lookup.get_reward(formula)
+                return doscar_reward
+            else:
+                return 0.0
+
         if energy_calculator is not None:
             e_form, e_above_hull = energy_calculator.calculate_energies(tmp_atoms)
-            
+
             if depth == 0:
                 self.e_form = e_form
                 self.e_above_hull = e_above_hull
-                
+
             if mode == 'eh':
                 # return -(10 * e_above_hull - 0.5)
                 return -e_above_hull
@@ -318,20 +328,29 @@ class MCTSTreeNode:
                 # Legacy mode: simple sum (biased toward formation energy due to magnitude)
                 return - e_form - e_above_hull
             elif mode.startswith('weighted'):
-                # New weighted mode: mode='weighted_alpha_beta' where alpha and beta are the weights
-                # Extract alpha and beta from mode string (e.g., 'weighted_1.0_2.0')
+                # New weighted mode: mode='weighted_alpha_beta_gamma' where alpha, beta, gamma are the weights
+                # Extract alpha, beta, gamma from mode string (e.g., 'weighted_1.0_2.0_0.5')
                 try:
                     parts = mode.split('_')
                     alpha = float(parts[1])
                     beta = float(parts[2])
+                    gamma = float(parts[3]) if len(parts) > 3 else 0.0
                 except (IndexError, ValueError):
                     alpha = 1.0  # Default to equal weighting
                     beta = 1.0
-                # Weighted combination: reward = alpha*(-e_form) + beta*(-e_above_hull)
-                # Simplifies to: reward = -alpha*e_form - beta*e_above_hull
-                # With typical values: e_form ~ -0.7, e_above_hull ~ 0.1
-                # alpha=1.0, beta=1.0 gives: -1.0*(-0.7) - 1.0*(0.1) = 0.7 - 0.1 = 0.6
-                return -alpha * e_form - beta * e_above_hull
+                    gamma = 0.0
+
+                # Get DOSCAR reward if gamma > 0 and doscar_lookup is available
+                doscar_reward = 0.0
+                if gamma > 0 and doscar_lookup is not None:
+                    formula = tmp_atoms.get_chemical_formula(mode='metal')
+                    doscar_reward = doscar_lookup.get_reward(formula)
+
+                # Weighted combination: reward = alpha*(-e_form) + beta*(-e_above_hull) + gamma*(doscar_reward)
+                # Simplifies to: reward = -alpha*e_form - beta*e_above_hull + gamma*doscar_reward
+                # With typical values: e_form ~ -0.7, e_above_hull ~ 0.1, doscar_reward ~ 0.3
+                # alpha=1.0, beta=1.0, gamma=1.0 gives: -1.0*(-0.7) - 1.0*(0.1) + 1.0*(0.3) = 0.7 - 0.1 + 0.3 = 0.9
+                return -alpha * e_form - beta * e_above_hull + gamma * doscar_reward
             else:
                 raise ValueError(f"Unknown mode: {mode}")
         else:
