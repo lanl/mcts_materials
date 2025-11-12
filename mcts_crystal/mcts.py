@@ -95,7 +95,7 @@ class MCTS:
             
     def expansion_simulation(self, rollout_depth: int = 1, n_rollout: int = 1,
                            energy_calculator=None, rollout_method: str = 'both',
-                           eh_weight: float = 1.0) -> Tuple[float, bool]:
+                           alpha: float = 1.0, beta: float = 1.0) -> Tuple[float, bool]:
         """
         Expand selected node and perform rollout simulation.
 
@@ -104,7 +104,8 @@ class MCTS:
             n_rollout: Number of rollout simulations
             energy_calculator: Energy calculator instance
             rollout_method: Rollout evaluation method ('fe', 'eh', 'both', or 'weighted')
-            eh_weight: Weight for energy above hull when using 'weighted' method (default: 1.0)
+            alpha: Weight for formation energy when using 'weighted' method (default: 1.0)
+            beta: Weight for energy above hull when using 'weighted' method (default: 1.0)
 
         Returns:
             Tuple of (reward, renew_t_to_terminate_flag)
@@ -162,7 +163,7 @@ class MCTS:
                 rewards.append((1 - 0.1 * rollout_depth) * rollout_reward)
         elif rollout_method == 'weighted':
             # Weighted combination of formation energy and energy above hull
-            weighted_mode = f'weighted_{eh_weight}'
+            weighted_mode = f'weighted_{alpha}_{beta}'
             rewards.append(new_node.rollout(depth=0, energy_calculator=energy_calculator, mode=weighted_mode))
             for _ in range(n_rollout - 1):
                 rollout_reward = new_node.rollout(
@@ -245,7 +246,7 @@ class MCTS:
     def run(self, n_iterations: int, energy_calculator=None,
             rollout_depth: int = 1, n_rollout: int = 10,
             selection_mode: str = 'epsilon', rollout_method: str = 'both',
-            eh_weight: float = 1.0) -> Dict:
+            alpha: float = 1.0, beta: float = 1.0) -> Dict:
         """
         Run MCTS algorithm for specified number of iterations.
 
@@ -256,8 +257,9 @@ class MCTS:
             n_rollout: Number of rollout simulations per expansion
             selection_mode: Node selection mode
             rollout_method: Rollout evaluation method ('fe', 'eh', 'both', or 'weighted')
-            eh_weight: Weight for energy above hull when using 'weighted' method (default: 1.0)
-                      Higher values prioritize hull stability over formation energy
+            alpha: Weight for formation energy when using 'weighted' method (default: 1.0)
+            beta: Weight for energy above hull when using 'weighted' method (default: 1.0)
+                  Reward = alpha*(-e_form) + beta*(-e_above_hull)
 
         Returns:
             Dictionary containing run statistics
@@ -281,7 +283,8 @@ class MCTS:
                 n_rollout=n_rollout,
                 energy_calculator=energy_calculator,
                 rollout_method=rollout_method,
-                eh_weight=eh_weight
+                alpha=alpha,
+                beta=beta
             )
             
             # Back-propagation

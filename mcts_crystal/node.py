@@ -142,6 +142,27 @@ class MCTSTreeNode:
         if self.f_block_mode == 'u_only':
             # U-only mode: restrict moves to only U (92)
             possible_moves = [92]  # Only U allowed
+        elif self.f_block_mode == 'lanthanides_u':
+            # Lanthanides + U mode: all lanthanides (Ce-Lu) plus Uranium
+            lanthanides = list(range(58, 72))  # Ce (58) to Lu (71)
+            allowed_elements = lanthanides + [92]  # Add U (92)
+
+            # Start with the current element
+            possible_moves = [atomic_num]
+
+            # Add adjacent elements (±1) if they exist and are in our allowed set
+            for delta in [-1, +1]:
+                neighbor = atomic_num + delta
+                if neighbor in allowed_elements:
+                    possible_moves.append(neighbor)
+
+            # Allow moves between lanthanides and U
+            if atomic_num == 92:
+                # From U, allow moves to middle lanthanides (around Nd)
+                possible_moves.append(60)  # Nd
+            elif atomic_num == 60:
+                # From Nd, allow moves to U
+                possible_moves.append(92)  # U
         elif self.f_block_mode == 'experimental':
             # Experimental mode: actinides (minus La) plus U, allowing adjacent comparisons
             lanthanides_no_la = list(range(58, 72))  # Ce (90) to La (72)
@@ -297,16 +318,20 @@ class MCTSTreeNode:
                 # Legacy mode: simple sum (biased toward formation energy due to magnitude)
                 return - e_form - e_above_hull
             elif mode.startswith('weighted'):
-                # New weighted mode: mode='weighted_alpha' where alpha is the weight for e_above_hull
-                # Extract alpha from mode string (e.g., 'weighted_5.0' means alpha=5.0)
+                # New weighted mode: mode='weighted_alpha_beta' where alpha and beta are the weights
+                # Extract alpha and beta from mode string (e.g., 'weighted_1.0_2.0')
                 try:
-                    alpha = float(mode.split('_')[1])
+                    parts = mode.split('_')
+                    alpha = float(parts[1])
+                    beta = float(parts[2])
                 except (IndexError, ValueError):
                     alpha = 1.0  # Default to equal weighting
-                # Weighted combination: reward = -e_form - alpha * e_above_hull
+                    beta = 1.0
+                # Weighted combination: reward = alpha*(-e_form) + beta*(-e_above_hull)
+                # Simplifies to: reward = -alpha*e_form - beta*e_above_hull
                 # With typical values: e_form ~ -0.7, e_above_hull ~ 0.1
-                # alpha=5.0 would give equal contribution: -(-0.7) - 5.0*(0.1) = 0.7 - 0.5 = 0.2
-                return -e_form - alpha * e_above_hull
+                # alpha=1.0, beta=1.0 gives: -1.0*(-0.7) - 1.0*(0.1) = 0.7 - 0.1 = 0.6
+                return -alpha * e_form - beta * e_above_hull
             else:
                 raise ValueError(f"Unknown mode: {mode}")
         else:

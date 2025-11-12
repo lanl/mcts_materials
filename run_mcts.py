@@ -3,16 +3,17 @@
 Simple MCTS Crystal Structure Optimization Runner
 
 Usage:
-    python run_mcts.py [--iterations N] [--structure path/to/file.cif] [--rollout-method METHOD] [--no-labels]
+    python run_mcts.py [OPTIONS]
 
 Examples:
-    python run_mcts.py                                    # Default: 1000 iterations, both rollout methods
+    python run_mcts.py                                    # Default: 1000 iterations, weighted rollout
     python run_mcts.py --iterations 100                  # 100 iterations
     python run_mcts.py --structure my_structure.cif      # Custom structure
     python run_mcts.py --rollout-method fe               # Formation energy rollouts only
     python run_mcts.py --rollout-method eh               # Energy above hull rollouts only
-    python run_mcts.py --rollout-method both             # Both methods (default)
-    python run_mcts.py --f-block-mode experimental       # Experimental actinides mode (no Ac)
+    python run_mcts.py --rollout-method weighted --alpha 2.0 --beta 3.0  # Custom weights
+    python run_mcts.py --f-block-mode lanthanides_u      # Lanthanides + Uranium mode
+    python run_mcts.py --exploration-constant 0.2        # Higher exploration (default: 0.1)
     python run_mcts.py --no-labels                       # Turn off labels on radial tree visualization
     python run_mcts.py --iterations 200 --structure my_structure.cif --rollout-method fe
 """
@@ -46,16 +47,18 @@ def main():
                        help='Path to starting crystal structure CIF file')
     parser.add_argument('--output', '-o', type=str, default='mcts_results',
                        help='Output directory name (default: mcts_results)')
-    parser.add_argument('--f-block-mode', type=str, default='u_only', 
-                       choices=['u_only', 'full_f_block', 'experimental'],
-                       help='F-block substitution mode: u_only (default), full_f_block, or experimental (actinides except Ac)')
-    parser.add_argument('--exploration-constant', type=float, default=0.1,
+    parser.add_argument('--f-block-mode', type=str, default='u_only',
+                       choices=['u_only', 'full_f_block', 'experimental', 'lanthanides_u'],
+                       help='F-block substitution mode: u_only (default), full_f_block, experimental (actinides except Ac), or lanthanides_u (lanthanides + U)')
+    parser.add_argument('--exploration-constant', '-c', type=float, default=0.1,
                        help='Exploration constant for UCB calculation (default: 0.1)')
     parser.add_argument('--rollout-method', type=str, default='weighted',
                        choices=['fe', 'eh', 'both', 'weighted'],
                        help='Rollout method: fe (formation energy), eh (energy above hull), both (mix of fe and eh), or weighted (tunable combination, default)')
-    parser.add_argument('--eh-weight', type=float, default=5.0,
-                       help='Weight for energy above hull when using weighted rollout method (default: 5.0). Higher values prioritize hull stability.')
+    parser.add_argument('--alpha', type=float, default=1.0,
+                       help='Weight for formation energy in weighted rollout method (default: 1.0). Reward = alpha*(-e_form) + beta*(-e_above_hull)')
+    parser.add_argument('--beta', type=float, default=1.0,
+                       help='Weight for energy above hull in weighted rollout method (default: 1.0). Reward = alpha*(-e_form) + beta*(-e_above_hull)')
     parser.add_argument('--mp-api-key', type=str, default=None,
                        help='Materials Project API key (required for rollout methods: eh, both, weighted)')
     parser.add_argument('--no-labels', action='store_true',
@@ -96,11 +99,11 @@ def main():
     
     # Step 2: Set up energy calculator
     print(f"\n2. Setting up energy calculator...")
-    csv_file = Path("high_throughput_results.full.csv")
+    csv_file = Path("high_throughput_mace_results.full.csv")
 
     if not csv_file.exists():
         print(f"❌ Error: MACE calculations file not found: {csv_file}")
-        print(f"   Please ensure high_throughput_results.full.csv is in the working directory")
+        print(f"   Please ensure high_throughput_mace_results.full.csv is in the working directory")
         return 1
     
     try:
@@ -147,7 +150,8 @@ def main():
     print(f"   Iterations: {args.iterations}")
     print(f"   Rollout method: {args.rollout_method}")
     if args.rollout_method == 'weighted':
-        print(f"   Energy above hull weight: {args.eh_weight}")
+        print(f"   Alpha (e_form weight): {args.alpha}")
+        print(f"   Beta (e_above_hull weight): {args.beta}")
     print(f"   This may take several minutes depending on cache hit rate...")
 
     try:
@@ -158,7 +162,8 @@ def main():
             n_rollout=5,
             selection_mode='epsilon',
             rollout_method=args.rollout_method,
-            eh_weight=args.eh_weight
+            alpha=args.alpha,
+            beta=args.beta
         )
         
         print(f"   ✓ Completed: {results['iterations_completed']} iterations")
@@ -332,8 +337,9 @@ def main():
     print(f"   python run_mcts.py --iterations {args.iterations}")
     print(f"   python run_mcts.py --iterations 1000  # Longer search")
     print(f"   python run_mcts.py --structure my_file.cif  # Different starting material")
-    print(f"   python run_mcts.py --f-block-mode full_f_block  # Use full f-block substitution")
-    print(f"   python run_mcts.py --exploration-constant 0.2  # Higher exploration")
+    print(f"   python run_mcts.py --f-block-mode lanthanides_u  # Lanthanides + U substitution")
+    print(f"   python run_mcts.py --alpha 2.0 --beta 3.0  # Custom reward weights")
+    print(f"   python run_mcts.py -c 0.2  # Higher exploration constant")
     
     print("=" * 80)
     

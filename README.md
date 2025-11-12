@@ -43,7 +43,7 @@ cd mcts_materials
 ```
 
 2. Ensure you have the high-throughput energy database:
-   - The code expects `high_throughput_results.full.csv` in the working directory
+   - The code expects `high_throughput_mace_results.full.csv` in the working directory
    - This file contains pre-computed MACE formation energies and energy above hull values
 
 3. Get a Materials Project API key (if using energy above hull):
@@ -270,7 +270,7 @@ mcts_materials/
 │   ├── energy_calculator.py       # Energy calculation interface
 │   ├── visualization.py           # Plotting and visualization
 │   └── analysis.py                # Results analysis tools
-├── high_throughput_results.full.csv  # Pre-computed energy database
+├── high_throughput_mace_results.full.csv  # Pre-computed energy database
 ├── examples/                      # Example structures and data
 │   └── mat_Pb6U1W6_sg191.cif     # Default starting structure
 └── sensitivity_studies/           # Parameter sensitivity analysis scripts
