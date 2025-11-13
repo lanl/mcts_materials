@@ -63,6 +63,8 @@ def main():
                        help='Weight for energy above hull in weighted rollout method (default: 1.0). Reward = alpha*(-e_form) + beta*(-e_above_hull) + gamma*(doscar_reward)')
     parser.add_argument('--gamma', type=float, default=0.0,
                        help='Weight for DOSCAR reward in weighted rollout method (default: 0.0). Reward = alpha*(-e_form) + beta*(-e_above_hull) + gamma*(doscar_reward)')
+    parser.add_argument('--termination-limit', type=int, default=60,
+                       help='Number of visits before terminating a node without improvement (default: 60)')
     parser.add_argument('--mp-api-key', type=str, default=None,
                        help='Materials Project API key (required for rollout methods: eh, both, weighted)')
     parser.add_argument('--no-labels', action='store_true',
@@ -150,13 +152,15 @@ def main():
     # Step 3: Initialize MCTS
     print(f"\n3. Initializing MCTS algorithm...")
     try:
-        root_node = MCTSTreeNode(atoms, f_block_mode=args.f_block_mode, 
-                                exploration_constant=args.exploration_constant)
+        root_node = MCTSTreeNode(atoms, f_block_mode=args.f_block_mode,
+                                exploration_constant=args.exploration_constant,
+                                termination_limit=args.termination_limit)
         mcts = MCTS(root_node)
-        
+
         print(f"   ✓ Root compound: {root_node.get_chemical_formula()}")
         print(f"   ✓ F-block mode: {args.f_block_mode}")
         print(f"   ✓ Exploration constant: {args.exploration_constant}")
+        print(f"   ✓ Termination limit: {args.termination_limit}")
         
         # Show search space
         root_node.expand()

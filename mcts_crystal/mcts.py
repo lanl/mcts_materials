@@ -14,12 +14,13 @@ class MCTS:
     Monte Carlo Tree Search algorithm for crystal structure optimization.
     """
     
-    def __init__(self, root: MCTSTreeNode):
+    def __init__(self, root: MCTSTreeNode, epsilon: float = 0.2):
         """
         Initialize MCTS algorithm.
-        
+
         Args:
             root: Root node of the MCTS tree
+            epsilon: Exploration rate for epsilon-greedy selection (default: 0.2)
         """
         self.root = root
         self.origin_root = root
@@ -29,6 +30,7 @@ class MCTS:
         self.max_reward = -10.0
         self.best_node: Optional[MCTSTreeNode] = None
         self.terminated = False
+        self.epsilon = epsilon
         
     def select_node(self, mode: str = 'epsilon') -> List[MCTSTreeNode]:
         """
@@ -61,7 +63,7 @@ class MCTS:
                 
             # Select next node based on mode
             if mode == 'epsilon':
-                if random.random() < 0.2:
+                if random.random() < self.epsilon:
                     current = current.children[self._probability_selector(ucb_values)]
                 else:
                     current = current.children[np.argmax(ucb_values)]
@@ -221,16 +223,22 @@ class MCTS:
         Record statistics for visited nodes.
         """
         formula = self.current_node.get_chemical_formula()
-        
+
         if formula not in self.stat_dict:
+            # Get DOS reward if available
+            dos_reward = 0.0
+            if hasattr(self, 'doscar_lookup') and self.doscar_lookup is not None:
+                dos_reward = self.doscar_lookup.get_reward(formula)
+
             self.stat_dict[formula] = [
                 self.current_node.get_rewards(total=False),
                 0,
                 False,
                 self.current_node.e_above_hull,
-                self.current_node.e_form
+                self.current_node.e_form,
+                dos_reward
             ]
-            
+
         self.stat_dict[formula][1] += 1
         
     def _probability_selector(self, ucb_values: List[float]) -> int:
@@ -282,6 +290,9 @@ class MCTS:
         Returns:
             Dictionary containing run statistics
         """
+        # Store doscar_lookup for statistics collection
+        self.doscar_lookup = doscar_lookup
+
         for i in range(n_iterations):
             if self.terminated:
                 break
@@ -329,13 +340,13 @@ class MCTS:
     def get_statistics_dataframe(self) -> pd.DataFrame:
         """
         Convert statistics dictionary to DataFrame.
-        
+
         Returns:
             DataFrame with statistics
         """
         stat_df = pd.DataFrame(self.stat_dict).T
         if not stat_df.empty:
-            stat_df.columns = ['best_reward', 'visit_count', 'terminated', 'e_above_hull', 'e_form']
+            stat_df.columns = ['best_reward', 'visit_count', 'terminated', 'e_above_hull', 'e_form', 'dos_reward']
             stat_df = stat_df.sort_values(by='visit_count', ascending=False)
         return stat_df
         

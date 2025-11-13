@@ -15,19 +15,21 @@ class MCTSTreeNode:
     in the MCTS tree structure.
     """
     
-    def __init__(self, atoms: Atoms, f_block_mode: str = 'u_only', exploration_constant: float = 0.1):
+    def __init__(self, atoms: Atoms, f_block_mode: str = 'u_only', exploration_constant: float = 0.1, termination_limit: int = 60):
         """
         Initialize an MCTS tree node.
-        
+
         Args:
             atoms: ASE Atoms object representing the crystal structure
             f_block_mode: F-block substitution mode ('u_only', 'full_f_block', or 'experimental')
             exploration_constant: Exploration constant for UCB calculation (default: 0.1)
+            termination_limit: Number of visits before terminating a node (default: 60)
         """
         self.atoms = atoms
         self.symbols = atoms.symbols
         self.f_block_mode = f_block_mode
         self.exploration_constant = exploration_constant
+        self.termination_limit = termination_limit
         self.parent: Optional['MCTSTreeNode'] = None
         self.children: List['MCTSTreeNode'] = []
         self.expandable = True
@@ -37,13 +39,13 @@ class MCTSTreeNode:
         self.e_form = 0.0
         self.e_above_hull = 0.0
         self.expansion_list: List['MCTSTreeNode'] = []
-        
+
         # MCTS statistics
         self.t_of_visit = 0
         self.total_reward = 0.0
         self.best_reward = -10.0
         self.terminated = False
-        self.t_to_terminate = 30
+        self.t_to_terminate = termination_limit
         
         # Initialize possible moves
         self._determine_possible_moves()
@@ -84,26 +86,21 @@ class MCTSTreeNode:
     def _determine_possible_moves(self):
         """
         Determine possible moves for transition metals, group IV elements, and f-block elements.
-        
+
         For transition metals: can move up, down, left, right on periodic table
-        For group IV elements: can move up and down within the group
-        For f-block elements: adjacent moves excluding elements 95-103
+        For group IV elements: ALL elements accessible (extended mode for better exploration)
+        For f-block elements: extended moves (±3) for better exploration
         """
         self.g_iv_move = [14, 32, 50, 82]  # Si, Ge, Sn, Pb
         self.f_block_move = []  # Will be set based on current f-block element
-        
+
         for atomic_num in set(self.atoms.get_atomic_numbers()):
             if atomic_num in self.g_iv_move:
                 self.g_iv = atomic_num
-                # Restrict moves based on current position
-                if atomic_num == 14:  # Si
-                    self.g_iv_move = [14, 32]
-                elif atomic_num == 32:  # Ge
-                    self.g_iv_move = [14, 32, 50]
-                elif atomic_num == 50:  # Sn
-                    self.g_iv_move = [32, 50, 82]
-                elif atomic_num == 82:  # Pb
-                    self.g_iv_move = [50, 82]
+                # EXTENDED MODE: Allow all Group IV elements to be reached
+                # This enables exploration of Si (highest DOS potential) from any starting point
+                # OLD: Pb→Sn→Ge→Si (3 moves), NEW: Pb→Si (1 move)
+                self.g_iv_move = [14, 32, 50, 82]  # All reachable
             elif 22 <= atomic_num <= 30:  # 3d transition metals
                 self.metal = atomic_num
                 if atomic_num == 22:  # Ti
@@ -135,34 +132,58 @@ class MCTSTreeNode:
     def _determine_f_block_moves(self, atomic_num: int):
         """
         Determine possible f-block element moves based on the f_block_mode.
-        
+
         Args:
             atomic_num: Current f-block atomic number
         """
         if self.f_block_mode == 'u_only':
             # U-only mode: restrict moves to only U (92)
             possible_moves = [92]  # Only U allowed
+        elif self.f_block_mode == 'lanthanides_u_extended':
+            # Extended Lanthanides + U mode: allows longer-range jumps
+            # This mode enables exploration of heavy lanthanides (Lu, Tm, Yb, etc.)
+            lanthanides = list(range(58, 72))  # Ce (58) to Lu (71)
+            allowed_elements = lanthanides + [92]
+
+            possible_moves = [atomic_num]
+
+            # Add extended-range moves (±1, ±2, ±3) for faster exploration
+            if atomic_num in lanthanides:
+                idx = lanthanides.index(atomic_num)
+                # Allow moves within ±3 positions with wrap-around
+                for delta in [-3, -2, -1, +1, +2, +3]:
+                    neighbor_idx = (idx + delta) % len(lanthanides)
+                    neighbor = lanthanides[neighbor_idx]
+                    possible_moves.append(neighbor)
+
+            # Allow transitions between lanthanides and U
+            if atomic_num == 92:
+                # From U, allow moves to Nd (60) and also to middle/heavy lanthanides
+                possible_moves.extend([60, 64, 68])  # Nd, Gd, Er (light, mid, heavy)
+            elif atomic_num in [60, 64, 68]:
+                # From key lanthanides, allow move back to U
+                possible_moves.append(92)
         elif self.f_block_mode == 'lanthanides_u':
             # Lanthanides + U mode: all lanthanides (Ce-Lu) plus Uranium
             lanthanides = list(range(58, 72))  # Ce (58) to Lu (71)
-            allowed_elements = lanthanides + [92]  # Add U (92)
+            allowed_elements = lanthanides + [92]
 
-            # Start with the current element
             possible_moves = [atomic_num]
 
-            # Add adjacent elements (±1) if they exist and are in our allowed set
-            for delta in [-1, +1]:
-                neighbor = atomic_num + delta
-                if neighbor in allowed_elements:
-                    possible_moves.append(neighbor)
+            # Add adjacent lanthanides with wrap-around behavior
+            if atomic_num in lanthanides:
+                idx = lanthanides.index(atomic_num)
+                left = lanthanides[(idx - 1) % len(lanthanides)]  # wraps Ce→Lu
+                right = lanthanides[(idx + 1) % len(lanthanides)] # wraps Lu→Ce
+                possible_moves.extend([left, right])
 
-            # Allow moves between lanthanides and U
+            # Allow transitions between lanthanides and U
             if atomic_num == 92:
-                # From U, allow moves to middle lanthanides (around Nd)
-                possible_moves.append(60)  # Nd
+                # From U, allow move to Nd (60)
+                possible_moves.append(60)
             elif atomic_num == 60:
-                # From Nd, allow moves to U
-                possible_moves.append(92)  # U
+                # From Nd, allow move to U
+                possible_moves.append(92)
         elif self.f_block_mode == 'experimental':
             # Experimental mode: actinides (minus La) plus U, allowing adjacent comparisons
             lanthanides_no_la = list(range(58, 72))  # Ce (90) to La (72)
@@ -231,6 +252,7 @@ class MCTSTreeNode:
                     new_node.symbols = new_atoms.symbols
                     new_node.f_block_mode = self.f_block_mode
                     new_node.exploration_constant = self.exploration_constant
+                    new_node.termination_limit = self.termination_limit
                     new_node.parent = None
                     new_node.children = []
                     new_node.expandable = True
@@ -244,7 +266,7 @@ class MCTSTreeNode:
                     new_node.total_reward = 0.0
                     new_node.best_reward = -10.0
                     new_node.terminated = False
-                    new_node.t_to_terminate = 30
+                    new_node.t_to_terminate = self.termination_limit
                     new_node._determine_possible_moves()
                     expansion_list.append(new_node)
         
@@ -389,9 +411,9 @@ class MCTSTreeNode:
             renew_t_to_terminate: Whether to reset termination countdown
         """
         self.t_of_visit += 1
-        
+
         if renew_t_to_terminate:
-            self.t_to_terminate = 30
+            self.t_to_terminate = self.termination_limit
         else:
             self.t_to_terminate -= 1
             
