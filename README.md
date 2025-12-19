@@ -27,7 +27,7 @@ The search focuses on intermetallic compounds with transition metals, Group IV e
 ### Requirements
 
 ```bash
-pip install ase pandas numpy matplotlib scipy
+pip install ase pandas numpy matplotlib scipy mace-torch matbench-discovery
 ```
 
 You'll also need:
@@ -42,11 +42,7 @@ git clone <repository-url>
 cd mcts_materials
 ```
 
-2. Ensure you have the high-throughput energy database:
-   - The code expects `high_throughput_results.full.csv` in the working directory
-   - This file contains pre-computed MACE formation energies and energy above hull values
-
-3. Get a Materials Project API key (if using energy above hull):
+2. Get a Materials Project API key (if using energy above hull):
    - Register at https://materialsproject.org/
    - Navigate to your dashboard and copy your API key
    - **Note**: API key is only required for rollout methods: `eh`, `both`, or `weighted`
@@ -74,31 +70,6 @@ This will:
 - Run 1000 iterations
 - Save results to `mcts_results/` directory
 - Generate visualizations and analysis reports
-
-### Custom Parameters
-
-```bash
-# Custom number of iterations
-python run_mcts.py --iterations 500 --mp-api-key YOUR_API_KEY
-
-# Custom starting structure
-python run_mcts.py --structure my_structure.cif --mp-api-key YOUR_API_KEY
-
-# Different rollout method (requires API key)
-python run_mcts.py --rollout-method eh --mp-api-key YOUR_API_KEY
-
-# Full f-block substitution mode
-python run_mcts.py --f-block-mode full_f_block --mp-api-key YOUR_API_KEY
-
-# Adjust energy above hull weighting
-python run_mcts.py --eh-weight 10.0 --mp-api-key YOUR_API_KEY
-
-# Higher exploration
-python run_mcts.py --exploration-constant 0.2 --mp-api-key YOUR_API_KEY
-
-# Custom output directory
-python run_mcts.py --output my_results --mp-api-key YOUR_API_KEY
-```
 
 ### Example Commands
 

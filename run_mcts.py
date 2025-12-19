@@ -66,7 +66,7 @@ def main():
     # Validate that MP API key is provided when needed
     methods_requiring_api_key = ['eh', 'both', 'weighted']
     if args.rollout_method in methods_requiring_api_key and args.mp_api_key is None:
-        print(f"❌ Error: --mp-api-key is required when using rollout method '{args.rollout_method}'")
+        print(f"   Error: --mp-api-key is required when using rollout method '{args.rollout_method}'")
         print(f"   Energy above hull calculations require Materials Project API access")
         print(f"   Get your API key from: https://materialsproject.org/api")
         print(f"   Then run with: --mp-api-key YOUR_KEY")
@@ -81,7 +81,7 @@ def main():
     structure_path = Path(args.structure)
     
     if not structure_path.exists():
-        print(f"❌ Error: Structure file not found: {structure_path}")
+        print(f"   Error: Structure file not found: {structure_path}")
         print(f"   Please check the file path or use the default structure")
         return 1
         
@@ -91,7 +91,7 @@ def main():
         print(f"   ✓ File: {structure_path}")
         print(f"   ✓ Atoms: {len(atoms)}")
     except Exception as e:
-        print(f"❌ Error loading structure: {e}")
+        print(f"   Error loading structure: {e}")
         return 1
     
     # Step 2: Set up energy calculator
@@ -99,7 +99,7 @@ def main():
     csv_file = Path("high_throughput_results.full.csv")
 
     if not csv_file.exists():
-        print(f"❌ Error: MACE calculations file not found: {csv_file}")
+        print(f"   Error: MACE calculations file not found: {csv_file}")
         print(f"   Please ensure high_throughput_results.full.csv is in the working directory")
         return 1
     
@@ -113,7 +113,7 @@ def main():
         else:
             print(f"   ⚠ No MP API key - energy above hull will be approximate (e_above_hull = e_form)")
     except Exception as e:
-        print(f"❌ Error setting up energy calculator: {e}")
+        print(f"  Error setting up energy calculator: {e}")
         return 1
     
     # Step 3: Initialize MCTS
@@ -139,7 +139,7 @@ def main():
                 print(f"   ✓ F-block elements: {len(root_node.f_block_move)} options (full f-block)")
             
     except Exception as e:
-        print(f"❌ Error initializing MCTS: {e}")
+        print(f"  Error initializing MCTS: {e}")
         return 1
     
     # Step 4: Run MCTS optimization
@@ -166,7 +166,7 @@ def main():
         print(f"   ✓ Search terminated: {results['terminated']}")
         
     except Exception as e:
-        print(f"❌ Error during MCTS run: {e}")
+        print(f"  Error during MCTS run: {e}")
         return 1
     
     # Step 4.5: Reconcile MCTS tree with MACE calculations CSV
@@ -198,7 +198,7 @@ def main():
             print("   ✓ MACE calculations CSV is already up-to-date.")
 
     except Exception as e:
-        print(f"❌ Error during MCTS reconciliation: {e}")
+        print(f"  Error during MCTS reconciliation: {e}")
         return 1
 
     # Step 5: Analyze results
@@ -215,7 +215,7 @@ def main():
         print(f"   ✓ Search efficiency: {efficiency['search_diversity']:.4f}")
         
     except Exception as e:
-        print(f"❌ Error analyzing results: {e}")
+        print(f"  Error analyzing results: {e}")
         return 1
     
     # Step 6: Save results
@@ -297,19 +297,19 @@ def main():
         print(f"   ✓ Results saved to: {output_dir.absolute()}")
         
     except Exception as e:
-        print(f"❌ Error saving results: {e}")
+        print(f"  Error saving results: {e}")
         return 1
     
     # Step 7: Display summary
     print(f"\n" + "=" * 80)
-    print("🎯 MCTS OPTIMIZATION COMPLETED SUCCESSFULLY!")
+    print("  MCTS OPTIMIZATION COMPLETED SUCCESSFULLY!")
     print("=" * 80)
-    print(f"🥇 Best compound: {results['best_node_formula']}")
-    print(f"⚡ Formation energy: {results['best_node_e_form']:.4f} eV/atom")
-    print(f"🔍 Total compounds explored: {len(results['stat_dict'])}")
-    print(f"📁 Results directory: {output_dir.absolute()}")
+    print(f"  Best compound: {results['best_node_formula']}")
+    print(f"  Formation energy: {results['best_node_e_form']:.4f} eV/atom")
+    print(f"  Total compounds explored: {len(results['stat_dict'])}")
+    print(f"  Results directory: {output_dir.absolute()}")
     
-    print(f"\n🏆 TOP 10 COMPOUNDS DISCOVERED:")
+    print(f"\n  TOP 10 COMPOUNDS DISCOVERED:")
     print("-" * 60)
     for i, (_, row) in enumerate(top_compounds.iterrows(), 1):
         stability = "Stable" if row['e_above_hull'] < 0.1 else "Metastable"
@@ -317,7 +317,7 @@ def main():
               f"E_form: {row['formation_energy']:8.4f} eV/atom | "
               f"{stability}")
     
-    print(f"\n📊 FILES CREATED:")
+    print(f"\n  FILES CREATED:")
     print(f"   • radial_tree_visualization.png - Tree structure with formation energies")
     print(f"   • energy_distribution.png - Formation energy distribution")
     print(f"   • iteration_progress.png - Search progress over iterations")
@@ -328,7 +328,7 @@ def main():
     print(f"   • mcts_report.txt - Detailed text report")
     print(f"   • all_compounds.csv - All discovered compounds data")
     
-    print(f"\n💡 To run again:")
+    print(f"\n  To run again:")
     print(f"   python run_mcts.py --iterations {args.iterations}")
     print(f"   python run_mcts.py --iterations 1000  # Longer search")
     print(f"   python run_mcts.py --structure my_file.cif  # Different starting material")
