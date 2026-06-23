@@ -353,7 +353,7 @@ class MaceEnergyCalculator:
 
             # Set calculator and optimize structure
             atoms_copy = atoms.copy()
-            atoms_copy.calc = self.calculator
+            atoms_copy.calc = calculator
 
             # Structural optimization with reasonable force threshold (0.05 eV/Å)
             atoms_filtered = ExpCellFilter(atoms_copy)
