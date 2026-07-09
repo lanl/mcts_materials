@@ -86,3 +86,14 @@ dos_only_study.py
 
 analysis/ehull_rdos_lanthanide_u_study_max_undiscounted/**/*.csv
 analysis/ehull_rdos_lanthanide_u_study_max_undiscounted/*.csv
+
+# La backfill scripts and results (abandoned — La excluded from design space)
+analysis/backfill_la_compounds.py
+analysis/merge_la_backfill.py
+analysis/la_backfill_results.csv
+
+# Eu start step3 run script (Yb_start_step3 is the canonical run)
+analysis/ehull_rdos_lanthanide_u_study_max_undiscounted/run_eu_start_step3.sh
+
+# Discovery efficiency figures (regenerate via generate_figures.py)
+analysis/discovery_efficiency_study/figures/
