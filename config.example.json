@@ -1,12 +1,10 @@
 {
-  "mp_api_key": "YOUR_MATERIALS_PROJECT_API_KEY",
-  "rollout_method": "ehull",
-  "iterations": 1000,
-  "beta": 1.0,
-  "gamma": 0.0001,
-  "selection_mode": "ucb1",
-  "epsilon": 0.2,
-  "temperature": 1.0,
-  "exploration_constant": 0.1,
-  "rollout_aggregation": "max"
+  "data_dir": "data/raw",
+  "processed_dir": "data/processed",
+  "modality": "solid_state",
+  "iterations": 250,
+  "top_k": 5,
+  "exploration_constant": 1.4,
+  "rollout_count": 8,
+  "seed": 0
 }

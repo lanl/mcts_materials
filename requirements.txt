@@ -1,6 +1,1 @@
-# Installs this package (editable) plus the heavy MACE/Materials Project/DFT
-# dependencies needed for live energy-above-hull calculations - the full
-# environment needed to reproduce the paper. See pyproject.toml for the
-# canonical dependency list and pip install -e . / -e .[dev] for lighter
-# installs that don't need mace-torch/pymatgen.
--e .[full]
+-e .[dev]

@@ -3,38 +3,26 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mcts-materials"
-version = "0.1.0"
-description = "Monte Carlo Tree Search for discovering stable f-block intermetallic crystal structures"
+name = "mcts-material-synthesis"
+version = "0.2.0"
+description = "Target-conditioned MCTS synthesis planning for inorganic materials"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "ase>=3.22",
     "numpy>=1.24",
     "pandas>=2.0",
-    "matplotlib>=3.7",
-    "networkx>=3.0",
-    "scipy>=1.10",
 ]
 
 [project.optional-dependencies]
-# Needed for live MACE relaxations and Materials Project energy-above-hull queries
-# (rollout-method ehull / ehull_rdos). Not needed for rdos-only runs, the rest of the
-# mcts_crystal package, or the test suite.
-full = [
-    "mace-torch>=0.3",
-    "matbench-discovery>=1.0",
-    "pymatgen>=2024.1.1",
-]
 dev = [
     "pytest>=7.0",
 ]
 
 [project.scripts]
-mcts-run = "mcts_crystal.cli:main"
+mcts-plan = "synthesis_planner.cli:main"
 
 [tool.setuptools]
-packages = ["mcts_crystal"]
+packages = ["synthesis_planner"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
