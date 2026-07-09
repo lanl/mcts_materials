@@ -79,8 +79,11 @@ def _lookup_dos(name: str, dos_rewards: dict) -> float:
     return 0.0
 
 
+SENTINEL_EHULL = 9.9  # compounds with e_above_hull >= this have missing MP data
+
+
 def load_design_space(repo_root: Path, dos_rewards: dict) -> pd.DataFrame:
-    """Load all 1,702 lanthanide+U compounds with composite scores."""
+    """Load valid lanthanide+U compounds (excludes sentinel e_above_hull >= 9.9)."""
     mace_csv = repo_root / 'high_throughput_mace_results.full.csv'
     df = pd.read_csv(mace_csv)
     if 'name' not in df.columns and 'formula' in df.columns:
@@ -88,6 +91,7 @@ def load_design_space(repo_root: Path, dos_rewards: dict) -> pd.DataFrame:
     df['re_elem'] = df['name'].apply(
         lambda n: next((e for e in _parse_elements(n) if e in LANTHANIDES_U), None))
     df = df[df['re_elem'].notna()].copy()
+    df = df[df['e_above_hull'] < SENTINEL_EHULL].copy()
     df['r_DOS'] = df['name'].apply(lambda n: _lookup_dos(n, dos_rewards))
     df['ehull_reward'] = df['e_above_hull'].apply(ehull_reward)
     df['weighted_r_DOS'] = NORMALIZED_GAMMA * df['r_DOS']
@@ -205,20 +209,24 @@ def write_top15_table(df_sorted: pd.DataFrame, global_ranks: dict,
     tables_dir = out_dir / 'tables'
     tables_dir.mkdir(parents=True, exist_ok=True)
 
-    top15 = df_sorted.head(15).copy()
+    # Skip sentinel compounds (missing MP data); take first 15 valid rows.
+    valid_rows = [row for _, row in df_sorted.iterrows()
+                  if float(row.get('e_above_hull', 0.0)) < SENTINEL_EHULL][:15]
+
     eol = ' \\\\\n'
     tex_path = tables_dir / 'top15_lanthanide_u.tex'
 
     with open(tex_path, 'w') as f:
         f.write(f'% Top 15 compounds (lanthanide+U study, Yb start). gamma={NORMALIZED_GAMMA:g}.\n')
-        f.write(f'% True Rank = rank within the full {n_space}-compound lanthanide+U design space.\n')
+        f.write(f'% True Rank = rank within the {n_space}-compound lanthanide+U design space\n')
+        f.write(f'% (compounds with missing MP stability data excluded from rankings).\n')
         f.write('\\begin{tabular}{rrlrrrr}\n')
         f.write('\\toprule\n')
         f.write('MCTS Rank & True Rank & Compound & $E_{\\mathrm{Hull}}$ (eV/atom) & '
                 '$r_{E_{\\mathrm{Hull}}}$ & $\\alpha_{\\mathrm{DOS}} \\cdot r_{\\mathrm{DOS}}$ '
                 '& Composite' + eol)
         f.write('\\midrule\n')
-        for mcts_rank, (_, row) in enumerate(top15.iterrows(), start=1):
+        for mcts_rank, row in enumerate(valid_rows, start=1):
             name = row.get('name', row.get('formula', ''))
             key = _decompose(str(name))
             true_rank = global_ranks.get(key, '--')
@@ -244,7 +252,7 @@ def main():
     print('Loading DOS rewards...')
     dos_rewards = load_dos_rewards(repo_root)
 
-    print('Loading full 1,702-compound lanthanide+U design space...')
+    print('Loading lanthanide+U design space (excluding sentinel ehull compounds)...')
     design_space = load_design_space(repo_root, dos_rewards)
     print(f'  Design space: {len(design_space)} compounds')
     print(f'  Global best: {design_space.iloc[0]["name"]} (composite={design_space.iloc[0]["composite_score"]:.4f})')
