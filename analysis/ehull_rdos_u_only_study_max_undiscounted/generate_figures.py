@@ -328,8 +328,14 @@ def plot_ehull_vs_rdos(repo_root: Path, out_dir: Path, mcts_run_dir: Path = None
                 shutil.copy(exp_src, exp_dst)
         except Exception:
             df_exp = None
+    if df_exp is None and exp_dst.exists():
+        try:
+            df_exp = pd.read_csv(exp_dst, sep=r"\s+", comment='#', header=None,
+                                 names=['name', 'e_form', 'e_hull'])
+        except Exception:
+            df_exp = None
 
-    fig, ax = plt.subplots(figsize=(4, 4))
+    fig, ax = plt.subplots(figsize=(3, 3))
     # Use r_dos (already present) or fall back to r_DOS column; plot gamma * r_DOS
     rdos_vals = df_u.get('r_dos', df_u.get('r_DOS', pd.Series(0.0))).astype(float) * gamma
     ax.scatter(rdos_vals, df_u['e_above_hull'].astype(float), s=6, color='#D0D0D0', label='All Compounds (U-containing)')
@@ -411,12 +417,43 @@ def plot_ehull_vs_rdos(repo_root: Path, out_dir: Path, mcts_run_dir: Path = None
             ax.scatter(xs, ys, s=45, color='#5BC0EB', marker='^', edgecolors='none',
                        alpha=0.45, label='Top 15 (MCTS)')
 
+        # Single red ellipse around unsuccessful-synthesis compounds that MCTS also found.
+        if df_exp is not None and not df_exp.empty:
+            _top15_keys = {_formula_key(str(r.get('name', r.get('formula', ''))))
+                           for _, r in top15.iterrows()}
+            _ell_x, _ell_y = [], []
+            for _, _r in df_exp.iterrows():
+                if any(elem_set(_r['name']) == s for s in synth_sets):
+                    continue  # successful synthesis — skip
+                if _formula_key(_r['name']) not in _top15_keys:
+                    continue  # not MCTS top-15 — skip
+                _key = _formula_key(_r['name'])
+                if _key in mace_lookup:
+                    _e, _rdos = mace_lookup[_key]
+                    _x = float(_rdos) * gamma
+                    # Keep only the tight bottom-right cluster (high r_DOS);
+                    # lower-x unsuccessful compounds would overlap the successful ones.
+                    if _x < 0.5:
+                        continue
+                    _ell_x.append(_x)
+                    _ell_y.append(float(_e))
+            if _ell_x:
+                from matplotlib.patches import Ellipse as _Ellipse
+                _pad_x, _pad_y = 0.04, 0.04
+                _cx = (max(_ell_x) + min(_ell_x)) / 2
+                _cy = (max(_ell_y) + min(_ell_y)) / 2
+                _ew = max(_ell_x) - min(_ell_x) + _pad_x * 2
+                _eh = max(_ell_y) - min(_ell_y) + _pad_y * 2
+                ax.add_patch(_Ellipse((_cx, _cy), width=_ew, height=_eh,
+                                      fill=False, edgecolor='red',
+                                      linewidth=1.5, zorder=5))
+
     # Annotate which starting material produced this Top-10 overlay, and how
     # far (in MCTS move-graph hops) it is from the true global-best compound.
     if start_label is None:
         start_label, start_dist = describe_mcts_run_starting_material(mcts_run_dir, repo_root)
 
-    ax.set_xlabel(r"$\alpha_{\mathrm{DOS}} \cdot r_{\mathrm{DOS}}$")
+    ax.set_xlabel(r"$r_{\mathrm{DOS}}$")
     ax.set_ylabel(r"$E_{\mathrm{Hull}}$ (eV/atom)")
     ax.axhline(0, color='k', linestyle='--', linewidth=0.8)
     # Create a clean legend with specific marker styles so Top10 appears as a triangle
@@ -432,10 +469,6 @@ def plot_ehull_vs_rdos(repo_root: Path, out_dir: Path, mcts_run_dir: Path = None
     legend_handles.append(Line2D([0], [0], marker='s', linestyle='None', markerfacecolor='#9467bd', markeredgecolor='#9467bd', markersize=9, label='Successful Synthesis'))
     ax.legend(handles=legend_handles, fontsize=8)
     plt.tight_layout()
-    if start_label is not None:
-        dist_str = f", d={start_dist} to global best" if start_dist is not None else ""
-        fig.text(0.5, -0.02, f"Top 15 (MCTS) from {start_label} start{dist_str}",
-                  ha='center', va='top', fontsize=7)
     out = out_dir / 'ehull_vs_rdos.png'
     fig.savefig(out, dpi=300, bbox_inches='tight')
     plt.close(fig)
