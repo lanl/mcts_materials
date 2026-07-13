@@ -50,7 +50,8 @@ def plot_convergence(csv_path, title, out_path, label_prefix=''):
     value_order = list(dict.fromkeys(df['value']))
     for value in value_order:
         sub = stats[stats['value'] == value]
-        ax.plot(sub['iteration'], sub['mean'], label=f"{label_prefix}{value}", linewidth=1)
+        display = str(value).replace(' (calibrated)', '')
+        ax.plot(sub['iteration'], sub['mean'], label=f"{label_prefix}{display}", linewidth=1)
         ax.fill_between(sub['iteration'], sub['p10'], sub['p90'], alpha=0.2)
 
     ax.set_xscale('log')

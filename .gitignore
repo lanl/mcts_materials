@@ -70,6 +70,12 @@ analysis/discovery_efficiency_study/run_study.log
 analysis/discovery_efficiency_study/run_study.sh
 analysis/discovery_efficiency_study/run_extended_10.sh
 analysis/discovery_efficiency_study/run_tm_variant.sh
+analysis/discovery_efficiency_study/run_extended_mode.sh
+# move1_seeds run scripts contain hardcoded API key — do not commit
+analysis/discovery_efficiency_study/run_move1_seeds.sh
+analysis/discovery_efficiency_study/run_move1_seeds_parallel.py
+# move1_seeds simulation outputs (regenerate via run_move1_seeds_parallel.py)
+analysis/discovery_efficiency_study/move1_seeds/
 analysis/discovery_efficiency_study/figures/discovery_curve.png
 analysis/discovery_efficiency_study/figures/discovery_curve_compare.png
 analysis/discovery_efficiency_study/figures/discovery_curve_cr.png
@@ -80,9 +86,22 @@ analysis/discovery_efficiency_study/tables/top15_best_run.tex
 analysis/ehull_rdos_u_only_study_max_undiscounted/figures/u_only_discovery_curve.png
 analysis/ehull_rdos_u_only_study_max_undiscounted/generate_u_discovery_figure.py
 analysis/ehull_rdos_u_only_study_max_undiscounted/sweep_starting_material_step2.py
+# Root-level figure copy (tracked version lives in figures/ subdir)
+analysis/ehull_rdos_u_only_study_max_undiscounted/ehull_vs_rdos.png
 
 # Misc scripts not part of main workflow
 dos_only_study.py
 
 analysis/ehull_rdos_lanthanide_u_study_max_undiscounted/**/*.csv
 analysis/ehull_rdos_lanthanide_u_study_max_undiscounted/*.csv
+
+# La backfill scripts and results (abandoned — La excluded from design space)
+analysis/backfill_la_compounds.py
+analysis/merge_la_backfill.py
+analysis/la_backfill_results.csv
+
+# Eu start step3 run script (Yb_start_step3 is the canonical run)
+analysis/ehull_rdos_lanthanide_u_study_max_undiscounted/run_eu_start_step3.sh
+
+# Discovery efficiency figures (regenerate via generate_figures.py)
+analysis/discovery_efficiency_study/figures/

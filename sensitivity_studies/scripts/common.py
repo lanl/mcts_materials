@@ -42,7 +42,7 @@ from mcts_crystal.cli import override_composition
 # effects aren't masked by starting so close to the optimum that the search
 # converges before any hyperparameter can matter.
 #
-# n_rollout=2/rollout_depth=2 means: every expansion draws two reward samples.
+# n_rollout=2/rollout_depth=3 means: every expansion draws two reward samples.
 # The first (depth=0) evaluates the new node's own composition and records its
 # e_form/e_above_hull. The second (depth=2) performs a max-along-walk: two
 # successive random substitutions are applied, the composite reward is scored
@@ -61,7 +61,7 @@ BASELINE = dict(
     epsilon=0.2,
     temperature=1.0,
     termination_limit=25,
-    rollout_depth=2,
+    rollout_depth=3,
     n_rollout=2,
     rollout_method='ehull_rdos',
     beta=1.0,
