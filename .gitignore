@@ -66,6 +66,9 @@ analysis/discovery_efficiency_study/fe_tm/
 analysis/discovery_efficiency_study/mn_tm/
 analysis/discovery_efficiency_study/ti_tm/
 analysis/discovery_efficiency_study/extended_mode/
+analysis/discovery_efficiency_study/product_mode/
+analysis/discovery_efficiency_study/product_mode_g1/
+analysis/discovery_efficiency_study/product_mode_g1_ms1/
 analysis/discovery_efficiency_study/run_study.log
 analysis/discovery_efficiency_study/run_study.sh
 analysis/discovery_efficiency_study/run_extended_10.sh
@@ -105,3 +108,7 @@ analysis/ehull_rdos_lanthanide_u_study_max_undiscounted/run_eu_start_step3.sh
 
 # Discovery efficiency figures (regenerate via generate_figures.py)
 analysis/discovery_efficiency_study/figures/
+analysis/ehull_rdos_u_only_study_max_undiscounted/run_product_mode.py
+analysis/ehull_rdos_u_only_study_max_undiscounted/run_starting_material_sweep_product.py
+analysis/discovery_efficiency_study/run_product_mode_g1_parallel.py
+analysis/discovery_efficiency_study/run_product_mode_g1_ms1_parallel.py

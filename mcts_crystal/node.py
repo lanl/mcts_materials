@@ -331,6 +331,7 @@ class MCTSTreeNode:
             mode: Evaluation mode. One of:
                 - 'ehull': reward = ehull_reward(e_above_hull)
                 - 'ehull_rdos_{beta}_{gamma}': reward = beta*ehull_reward(e_above_hull) + gamma*r_DOS
+                - 'ehull_rdos_product_{gamma}': reward = ehull_reward(e_above_hull) * (gamma*r_DOS)
                 - 'rdos': reward = r_DOS only
             doscar_lookup: DoscarRewardLookup instance for DOSCAR-derived rDOS rewards
             rng: Random source exposing .choice(). Defaults to the shared `random` module.
@@ -362,6 +363,15 @@ class MCTSTreeNode:
                 self.e_above_hull = e_above_hull
             if mode == 'ehull':
                 return ehull_reward(e_above_hull)
+            elif mode.startswith('ehull_rdos_product'):
+                try:
+                    gamma = float(mode.split('_')[3])
+                except (IndexError, ValueError):
+                    gamma = 0.0001
+                doscar_reward = 0.0
+                if gamma > 0 and doscar_lookup is not None:
+                    doscar_reward = doscar_lookup.get_reward(atoms.get_chemical_formula(mode='metal'))
+                return ehull_reward(e_above_hull) * (gamma * doscar_reward)
             elif mode.startswith('ehull_rdos'):
                 try:
                     parts = mode.split('_')

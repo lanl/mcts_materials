@@ -42,7 +42,8 @@ def plot_convergence(csv_path, title, out_path, label_prefix=''):
     def _pctl_agg(s):
         return pd.Series({'mean': s.mean(), 'p10': np.percentile(s, 10), 'p90': np.percentile(s, 90)})
 
-    stats = df.groupby(['value', 'iteration'])['best_reward'].apply(_pctl_agg).unstack().reset_index()
+    x_col = 'n_unique_compounds' if 'n_unique_compounds' in df.columns else 'iteration'
+    stats = df.groupby(['value', x_col])['best_reward'].apply(_pctl_agg).unstack().reset_index()
 
     fig, ax = plt.subplots()
     # Preserve the order values were defined in the sweep script, not
@@ -50,12 +51,15 @@ def plot_convergence(csv_path, title, out_path, label_prefix=''):
     value_order = list(dict.fromkeys(df['value']))
     for value in value_order:
         sub = stats[stats['value'] == value]
+        # Truncate at 108 (U-only design space size); iterations past that
+        # are MCTS revisits of already-evaluated compounds.
+        sub = sub[sub[x_col] <= 108]
         display = str(value).replace(' (calibrated)', '')
-        ax.plot(sub['iteration'], sub['mean'], label=f"{label_prefix}{display}", linewidth=1)
-        ax.fill_between(sub['iteration'], sub['p10'], sub['p90'], alpha=0.2)
+        ax.plot(sub[x_col], sub['mean'], label=f"{label_prefix}{display}", linewidth=1)
+        ax.fill_between(sub[x_col], sub['p10'], sub['p90'], alpha=0.2)
 
     ax.set_xscale('log')
-    ax.set_xlabel('Iteration')
+    ax.set_xlabel('Unique compounds evaluated')
     ax.set_ylabel('Best composite reward')
     if title:
         ax.set_title(title)

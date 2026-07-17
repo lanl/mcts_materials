@@ -27,7 +27,7 @@ class TestBuildParser:
     def test_rollout_method_choices(self):
         parser = build_parser({})
         rollout_action = next(a for a in parser._actions if a.dest == 'rollout_method')
-        assert rollout_action.choices == ['ehull', 'ehull_rdos', 'rdos']
+        assert rollout_action.choices == ['ehull', 'ehull_rdos', 'ehull_rdos_product', 'rdos']
 
     def test_default_rollout_method_is_ehull(self):
         args = build_parser({}).parse_args([])

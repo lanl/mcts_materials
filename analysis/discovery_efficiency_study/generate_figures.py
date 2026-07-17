@@ -123,15 +123,25 @@ def load_run(study_dir, elem, tm, subdir, dos_rewards):
     return df, conv_df
 
 
+def _apply_no_mp_penalty(df):
+    """Mirror energy_calculator: set e_above_hull=10.0 for no_mp_data/error rows."""
+    if 'data_quality' in df.columns:
+        mask = df['data_quality'].isin(['no_mp_data', 'error'])
+        df.loc[mask, 'e_above_hull'] = 10.0
+    return df
+
+
 def load_design_space(repo_root, dos_rewards):
-    """Full 1702-compound lanthanide+U design space."""
+    """Lanthanide+U design space excluding La. no_mp_data compounds kept but penalised
+    (e_above_hull set to 10.0 → r_Ehull ≈ -1) to match energy_calculator behaviour."""
     mace_csv = repo_root / 'high_throughput_mace_results.full.csv'
     df = pd.read_csv(mace_csv)
     if 'name' not in df.columns and 'formula' in df.columns:
         df = df.rename(columns={'formula': 'name'})
     df['re'] = df['name'].apply(
         lambda n: next((e for e in _parse_elements(n) if e in LANTHANIDES_U_SET), None))
-    df = df[df['re'].notna()].copy()
+    df = df[df['re'].notna() & (df['re'] != 'La')].copy()
+    df = _apply_no_mp_penalty(df)
     df['r_DOS'] = df['name'].apply(lambda n: _lookup_dos(n, dos_rewards))
     df['composite'] = df['e_above_hull'].apply(ehull_reward) + NORMALIZED_GAMMA * df['r_DOS']
     return df.reset_index(drop=True)
@@ -197,6 +207,11 @@ def format_name(name):
 
 
 def compute_global_ranks(repo_root, dos_rewards):
+    """Rank all compounds by multiplicative reward: r_Ehull × (gamma × r_DOS).
+
+    La excluded (not in expansion). no_mp_data compounds kept but penalised to
+    e_above_hull=10 → r_Ehull≈-1 → negative product → naturally rank last.
+    """
     mace_csv = repo_root / 'high_throughput_mace_results.full.csv'
     if not mace_csv.exists():
         return {}
@@ -205,9 +220,11 @@ def compute_global_ranks(repo_root, dos_rewards):
         df = df.rename(columns={'formula': 'name'})
     df['re'] = df['name'].apply(
         lambda n: next((e for e in _parse_elements(n) if e in LANTHANIDES_U_SET), None))
-    df = df[df['re'].notna()].copy()
+    df = df[df['re'].notna() & (df['re'] != 'La')].copy()
+    df = _apply_no_mp_penalty(df)
     df['r_DOS'] = df['name'].apply(lambda n: _lookup_dos(n, dos_rewards))
-    df['composite'] = df['e_above_hull'].apply(ehull_reward) + NORMALIZED_GAMMA * df['r_DOS']
+    df['composite'] = (df['e_above_hull'].apply(ehull_reward)
+                       * (NORMALIZED_GAMMA * df['r_DOS']))
     df = df.sort_values('composite', ascending=False).reset_index(drop=True)
     ranks = {}
     for rank, (_, row) in enumerate(df.iterrows(), start=1):
@@ -377,6 +394,620 @@ def plot_discovery_curve_extended(study_dir, design_space, dos_rewards):
     figures_dir = study_dir / 'figures'
     figures_dir.mkdir(exist_ok=True)
     fig_path = figures_dir / 'discovery_curve_edit_distance_extended.png'
+    fig.savefig(fig_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f'Saved figure: {fig_path}')
+
+
+def load_product_seeds(study_dir, elem, tm, n_seeds, subdir='product_mode_g1'):
+    """Load up to n_seeds convergence curves from a product-mode run directory.
+
+    Returns list of (x_array, y_array) tuples using best_reward (product metric).
+    """
+    prod_dir = study_dir / subdir
+    curves = []
+    for seed in range(n_seeds):
+        run_dir = prod_dir / f'{elem}_{tm}_s{seed}'
+        conv_csv = run_dir / 'convergence_history.csv'
+        if not conv_csv.exists():
+            continue
+        conv_df = pd.read_csv(conv_csv)
+        x_m, y_m = mcts_curve_from_conv(conv_df)
+        curves.append((x_m, y_m))
+    return curves
+
+
+def plot_discovery_curve_product(study_dir, design_space, dos_rewards,
+                                  subdir='product_mode_g1', suffix='ms3'):
+    """Generate discovery_curve_edit_distance_product_{suffix}.png.
+
+    Same layout as the extended figure but using the multiplicative reward
+    (r_Ehull × r_DOS).  Random baseline is recomputed with the product
+    metric so the comparison is on the same scale.
+    """
+    prod_dir = study_dir / subdir
+    if not prod_dir.exists():
+        print(f'plot_discovery_curve_product: {subdir}/ not found; skipping.')
+        return
+
+    x_grid = np.arange(1, X_MAX + 1)
+
+    # --- Load product-mode runs, aggregate across seeds ---
+    run_records = []
+    for elem, tm in EXTENDED_MCTS_RUNS:
+        seed_curves = load_product_seeds(study_dir, elem, tm, N_EXTENDED_SEEDS, subdir)
+        if not seed_curves:
+            continue
+        dist = edit_distance(elem, tm)
+        interps = []
+        for x_m, y_m in seed_curves:
+            interp = interpolate_curve(x_m, y_m, x_grid)
+            n = int(x_m.max()) if len(x_m) else 0
+            interp[n:] = np.nan
+            interps.append(interp)
+        mat = np.array(interps)
+        with np.errstate(all='ignore'):
+            med = np.nanmedian(mat, axis=0)
+            p25 = np.nanpercentile(mat, 25, axis=0)
+            p75 = np.nanpercentile(mat, 75, axis=0)
+        best = float(np.nanmax(mat))
+        run_records.append({
+            'label': f'{elem}-{tm}',
+            'elem': elem, 'tm': tm,
+            'dist': dist,
+            'med': med, 'p25': p25, 'p75': p75,
+            'n_seeds': len(seed_curves),
+            'best': best,
+        })
+
+    if not run_records:
+        print(f'plot_discovery_curve_product ({suffix}): no data found; skipping.')
+        return
+
+    print(f'Product mode ({suffix}): loaded {len(run_records)} starting materials '
+          f'(total seeds: {sum(r["n_seeds"] for r in run_records)}).')
+
+    # --- Random baseline using product reward metric (gamma=1: r_Ehull × r_DOS) ---
+    r_ehull_arr = design_space['e_above_hull'].apply(ehull_reward).values
+    r_dos_arr = design_space['r_DOS'].values
+    product_scores = r_ehull_arr * r_dos_arr
+
+    rng = np.random.default_rng(0)
+    N = len(product_scores)
+    rand_mat = np.empty((N_RANDOM_REPS, X_MAX))
+    for rep in range(N_RANDOM_REPS):
+        perm = np.arange(N)
+        rng.shuffle(perm)
+        rand_mat[rep] = np.maximum.accumulate(product_scores[perm[:X_MAX]])
+    rand_p50 = np.percentile(rand_mat, 50, axis=0)
+    rand_p25 = np.percentile(rand_mat, 25, axis=0)
+    rand_p75 = np.percentile(rand_mat, 75, axis=0)
+
+    # --- Figure ---
+    max_dist = max(r['dist'] for r in run_records)
+    cmap = plt.colormaps['RdBu_r']
+
+    fig, ax = plt.subplots(figsize=(3, 3))
+
+    ax.fill_between(x_grid, rand_p25, rand_p75, color='#888888', alpha=0.20,
+                    label='Random')
+    ax.plot(x_grid, rand_p50, color='#555555', lw=1.8, linestyle='--',
+            label='_nolegend_')
+
+    for rec in sorted(run_records, key=lambda r: -r['dist']):
+        c = cmap(rec['dist'] / max(max_dist, 1))
+        valid = ~np.isnan(rec['med'])
+        if not valid.any():
+            continue
+        ax.fill_between(x_grid[valid], rec['p25'][valid], rec['p75'][valid],
+                        color=c, alpha=0.18, linewidth=0)
+        ax.plot(x_grid[valid], rec['med'][valid], color=c, lw=1.0, alpha=0.85)
+
+    sm = plt.cm.ScalarMappable(cmap=cmap,
+                               norm=plt.Normalize(vmin=0, vmax=max_dist))
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=ax, pad=0.02, shrink=0.85)
+    cbar.set_label('Edit distance to\nglobal best', fontsize=8)
+    cbar.ax.tick_params(labelsize=7)
+
+    ax.set_xscale('log')
+    ax.set_xlabel('Unique compounds evaluated', fontsize=10)
+    ax.set_ylabel(r'Best product reward ($r_{E_\mathrm{Hull}} \times r_\mathrm{DOS}$)',
+                  fontsize=9)
+    ax.tick_params(labelsize=9)
+    ax.legend(fontsize=8, frameon=False, loc='lower right')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    fig.tight_layout()
+    figures_dir = study_dir / 'figures'
+    figures_dir.mkdir(exist_ok=True)
+    fig_path = figures_dir / f'discovery_curve_edit_distance_product_{suffix}.png'
+    fig.savefig(fig_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f'Saved figure: {fig_path}')
+
+
+def plot_discovery_curve_ms1_vs_ms3(study_dir, design_space, dos_rewards):
+    """Compare +1 move vs +3 move product-reward discovery curves.
+
+    Pools all starting materials and shows grand-median best product reward
+    vs unique compounds evaluated for product_mode_g1_ms1 (+1 move) and
+    product_mode_g1 (+3 move), plus the random baseline.
+    """
+    ms3_dir = study_dir / 'product_mode_g1'
+    ms1_dir = study_dir / 'product_mode_g1_ms1'
+    if not ms3_dir.exists() and not ms1_dir.exists():
+        print('plot_discovery_curve_ms1_vs_ms3: neither ms1 nor ms3 data found; skipping.')
+        return
+
+    x_grid = np.arange(1, X_MAX + 1)
+
+    def _pool_curves(subdir):
+        """Collect and interpolate all seed curves from one move-step directory."""
+        all_interps = []
+        for elem, tm in EXTENDED_MCTS_RUNS:
+            seed_curves = load_product_seeds(study_dir, elem, tm, N_EXTENDED_SEEDS, subdir)
+            for x_m, y_m in seed_curves:
+                interp = interpolate_curve(x_m, y_m, x_grid)
+                n = int(x_m.max()) if len(x_m) else 0
+                interp[n:] = np.nan
+                all_interps.append(interp)
+        return np.array(all_interps) if all_interps else None
+
+    mat_ms3 = _pool_curves('product_mode_g1')
+    mat_ms1 = _pool_curves('product_mode_g1_ms1')
+
+    # Random baseline (product reward)
+    r_ehull_arr = design_space['e_above_hull'].apply(ehull_reward).values
+    r_dos_arr = design_space['r_DOS'].values
+    product_scores = r_ehull_arr * r_dos_arr
+    rng = np.random.default_rng(0)
+    N = len(product_scores)
+    rand_mat = np.empty((N_RANDOM_REPS, X_MAX))
+    for rep in range(N_RANDOM_REPS):
+        perm = np.arange(N)
+        rng.shuffle(perm)
+        rand_mat[rep] = np.maximum.accumulate(product_scores[perm[:X_MAX]])
+    rand_p50 = np.percentile(rand_mat, 50, axis=0)
+    rand_p25 = np.percentile(rand_mat, 25, axis=0)
+    rand_p75 = np.percentile(rand_mat, 75, axis=0)
+
+    fig, ax = plt.subplots(figsize=(3.5, 3))
+
+    ax.fill_between(x_grid, rand_p25, rand_p75, color='#888888', alpha=0.20)
+    ax.plot(x_grid, rand_p50, color='#555555', lw=1.5, linestyle='--', label='Random')
+
+    series = [
+        (mat_ms3, '#2166AC', '+3 move (product)'),
+        (mat_ms1, '#4DAC26', '+1 move (product)'),
+    ]
+    for mat, color, label in series:
+        if mat is None:
+            continue
+        # Only show percentiles where ≥10 seeds have data to avoid end-of-run IQR spikes.
+        coverage = np.sum(~np.isnan(mat), axis=0)
+        with np.errstate(all='ignore'):
+            med = np.where(coverage >= 10, np.nanmedian(mat, axis=0), np.nan)
+            p25 = np.where(coverage >= 10, np.nanpercentile(mat, 25, axis=0), np.nan)
+            p75 = np.where(coverage >= 10, np.nanpercentile(mat, 75, axis=0), np.nan)
+        valid = ~np.isnan(med)
+        if not valid.any():
+            continue
+        ax.fill_between(x_grid[valid], p25[valid], p75[valid],
+                        color=color, alpha=0.20, linewidth=0)
+        ax.plot(x_grid[valid], med[valid], color=color, lw=1.8, label=label)
+
+    ax.set_xscale('log')
+    ax.set_ylim(bottom=0)
+    ax.set_xlabel('Unique compounds evaluated', fontsize=10)
+    ax.set_ylabel(r'Best product reward ($r_{E_\mathrm{Hull}} \times r_\mathrm{DOS}$)',
+                  fontsize=9)
+    ax.tick_params(labelsize=9)
+    ax.legend(fontsize=8, frameon=False, loc='lower right')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    fig.tight_layout()
+
+    figures_dir = study_dir / 'figures'
+    figures_dir.mkdir(exist_ok=True)
+    fig_path = figures_dir / 'discovery_curve_product_ms1_vs_ms3.png'
+    fig.savefig(fig_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f'Saved figure: {fig_path}')
+
+
+def plot_ehull_vs_rdos_product(study_dir, design_space, dos_rewards):
+    """Scatter of full design space with top compounds from product-mode runs overlaid.
+
+    Background: all lanthanide+U compounds (gray).
+    Overlay: top 20 unique compounds by additive composite score discovered across
+    all product-mode seeds (blue triangles) — same axes as the existing ehull_vs_rdos
+    figure so the two are directly comparable.
+    """
+    prod_dir = study_dir / 'product_mode_g1'
+    if not prod_dir.exists():
+        print('plot_ehull_vs_rdos_product: product_mode_g1/ not found; skipping.')
+        return
+
+    # Pool all unique compounds discovered across every product-mode seed
+    all_rows = []
+    for elem, tm in EXTENDED_MCTS_RUNS:
+        for seed in range(N_EXTENDED_SEEDS):
+            csv = prod_dir / f'{elem}_{tm}_s{seed}' / 'all_compounds.csv'
+            if not csv.exists():
+                continue
+            df = pd.read_csv(csv)
+            if 'name' not in df.columns and 'formula' in df.columns:
+                df = df.rename(columns={'formula': 'name'})
+            all_rows.append(df)
+
+    if not all_rows:
+        print('plot_ehull_vs_rdos_product: no compound data found; skipping.')
+        return
+
+    pooled = pd.concat(all_rows, ignore_index=True)
+    # Deduplicate by formula; keep row with lowest e_above_hull per compound
+    pooled = (pooled.sort_values('e_above_hull')
+              .drop_duplicates(subset=['name'], keep='first')
+              .reset_index(drop=True))
+    pooled = pooled[pooled['e_above_hull'] < SENTINEL_EHULL].reset_index(drop=True)
+    # Rank by product reward (same metric used during search)
+    pooled['r_DOS_val'] = pooled['name'].apply(lambda n: _lookup_dos(n, dos_rewards))
+    pooled['r_ehull'] = pooled['e_above_hull'].apply(ehull_reward)
+    pooled['product_reward'] = pooled['r_ehull'] * pooled['r_DOS_val']
+    pooled = pooled.sort_values('product_reward', ascending=False).reset_index(drop=True)
+    top15 = pooled.head(15)
+    print(f'Product-mode ehull_vs_rdos: {len(pooled)} unique compounds; '
+          f'top product_reward={pooled["product_reward"].iloc[0]:.4f}')
+
+    # --- Figure ---
+    fig, ax = plt.subplots(figsize=(3, 3))
+
+    x_all = design_space['r_DOS'].values
+    y_all = design_space['e_above_hull'].values
+    ax.scatter(x_all, y_all, s=4, color='#D0D0D0', linewidths=0,
+               label=f'All Compounds (n={len(design_space):,})')
+
+    xs = top15['r_DOS_val'].values
+    ys = top15['e_above_hull'].values
+    ax.scatter(xs, ys, s=45, color='#5BC0EB', marker='^',
+               edgecolors='none', alpha=0.55, label='Top 15 (MCTS)')
+
+    ax.axhline(0, color='k', linestyle='--', linewidth=0.8)
+    ax.set_ylim(top=2)
+    ax.set_xlabel(r'$r_{\mathrm{DOS}}$', fontsize=9)
+    ax.set_ylabel(r'$E_{\mathrm{Hull}}$ (eV/atom)', fontsize=9)
+    ax.tick_params(labelsize=8)
+
+    from matplotlib.lines import Line2D
+    legend_handles = [
+        Line2D([0], [0], marker='o', linestyle='None',
+               markerfacecolor='#D0D0D0', markeredgecolor='#D0D0D0',
+               markersize=5, label='All Compounds'),
+        Line2D([0], [0], marker='^', linestyle='None',
+               markerfacecolor='#5BC0EB', markeredgecolor='none',
+               markersize=7, alpha=0.55, label='Top 15 (MCTS)'),
+    ]
+    ax.legend(handles=legend_handles, fontsize=7)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    plt.tight_layout()
+    figures_dir = study_dir / 'figures'
+    figures_dir.mkdir(exist_ok=True)
+    out_path = figures_dir / 'ehull_vs_rdos_product.png'
+    fig.savefig(out_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f'Saved figure: {out_path}')
+
+
+SENTINEL_EHULL = 9.9  # compounds at or above this have missing MP data
+
+
+def _top15_avg_rank(run_dir_list, dos_rewards, global_ranks, design_space_size):
+    """Pool all_compounds.csv files from run_dir_list, deduplicate, return avg global
+    rank of the top-15 compounds by additive composite score.  Compounds missing from
+    global_ranks (no MP data) are assigned rank design_space_size + 1.
+    """
+    frames = []
+    for d in run_dir_list:
+        csv = d / 'all_compounds.csv'
+        if not csv.exists():
+            continue
+        df = pd.read_csv(csv)
+        if 'name' not in df.columns and 'formula' in df.columns:
+            df = df.rename(columns={'formula': 'name'})
+        frames.append(df[['name', 'e_above_hull']].copy())
+    if not frames:
+        return None
+    pooled = pd.concat(frames, ignore_index=True)
+    pooled = (pooled.sort_values('e_above_hull')
+              .drop_duplicates(subset=['name'], keep='first')
+              .reset_index(drop=True))
+    pooled['r_DOS'] = pooled['name'].apply(lambda n: _lookup_dos(n, dos_rewards))
+    pooled['composite'] = (pooled['e_above_hull'].apply(ehull_reward)
+                           * (NORMALIZED_GAMMA * pooled['r_DOS']))
+    pooled = pooled.sort_values('composite', ascending=False).reset_index(drop=True)
+    top15 = pooled.head(15)
+    ranks = [global_ranks.get(_decompose(row['name']), design_space_size + 1)
+             for _, row in top15.iterrows()]
+    return float(np.mean(ranks))
+
+
+def plot_edit_distance_vs_rank(study_dir, design_space, dos_rewards, global_ranks):
+    """Edit distance vs. average global rank of top-15 compounds found by MCTS.
+
+    One point per (elem, tm) starting material, pooled across all seeds.
+    Shown for both extended-mode (additive) and product-mode (multiplicative) runs.
+    Lower rank = better discovery.
+    """
+    prod_dir = study_dir / 'product_mode_g1'
+    ext_dir = study_dir / 'extended_mode'
+    n_space = len(design_space)
+
+    series = {}  # label -> list of (dist, avg_rank)
+    for mode_label, base_dir in [('Additive', ext_dir), ('Multiplicative', prod_dir)]:
+        if not base_dir.exists():
+            continue
+        points = []
+        for elem, tm in EXTENDED_MCTS_RUNS:
+            run_dirs = [base_dir / f'{elem}_{tm}_s{seed}'
+                        for seed in range(N_EXTENDED_SEEDS)]
+            avg_rank = _top15_avg_rank(run_dirs, dos_rewards, global_ranks, n_space)
+            if avg_rank is None:
+                continue
+            points.append((edit_distance(elem, tm), avg_rank))
+        if points:
+            series[mode_label] = points
+
+    if not series:
+        print('plot_edit_distance_vs_rank: no data found; skipping.')
+        return
+
+    fig, ax = plt.subplots(figsize=(3.5, 3))
+    colors = {'Additive': '#2166AC', 'Multiplicative': '#D6604D'}
+    markers = {'Additive': 'o', 'Multiplicative': 's'}
+
+    for label, points in series.items():
+        dists = np.array([p[0] for p in points])
+        ranks = np.array([p[1] for p in points])
+        # scatter individual starting materials
+        ax.scatter(dists, ranks, color=colors[label], marker=markers[label],
+                   s=25, alpha=0.6, linewidths=0, label=f'_{label}')
+        # median line grouped by unique edit distance
+        unique_dists = sorted(set(dists))
+        med_ranks = [np.median(ranks[dists == d]) for d in unique_dists]
+        ax.plot(unique_dists, med_ranks, color=colors[label], lw=1.5,
+                marker=markers[label], markersize=5, label=label)
+
+    ax.invert_yaxis()  # rank 1 at top
+    ax.set_xlabel('Edit distance to global best', fontsize=10)
+    ax.set_ylabel('Avg. global rank (top-15)', fontsize=10)
+    ax.tick_params(labelsize=9)
+    ax.legend(fontsize=8, frameon=False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    fig.tight_layout()
+    figures_dir = study_dir / 'figures'
+    figures_dir.mkdir(exist_ok=True)
+    fig_path = figures_dir / 'edit_distance_vs_rank.png'
+    fig.savefig(fig_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f'Saved figure: {fig_path}')
+
+
+def plot_discovery_curve_product_single(study_dir, design_space, dos_rewards):
+    """Non-extended product-mode discovery curve: one line per starting material (seed 0).
+
+    Mirrors discovery_curve_edit_distance.png format but for the multiplicative reward
+    runs.  Each starting material shown as a single curve coloured by edit distance.
+    """
+    x_grid = np.arange(1, X_MAX + 1)
+    prod_dir = study_dir / 'product_mode_g1'
+    if not prod_dir.exists():
+        print('plot_discovery_curve_product_single: product_mode_g1/ not found; skipping.')
+        return
+
+    run_records = []
+    for elem, tm in EXTENDED_MCTS_RUNS:
+        conv_csv = prod_dir / f'{elem}_{tm}_s0' / 'convergence_history.csv'
+        if not conv_csv.exists():
+            continue
+        conv_df = pd.read_csv(conv_csv)
+        x_m, y_m = mcts_curve_from_conv(conv_df)
+        if len(x_m) == 0:
+            continue
+        dist = edit_distance(elem, tm)
+        interp = interpolate_curve(x_m, y_m, x_grid)
+        n = int(x_m.max())
+        interp[n:] = np.nan
+        best = float(np.nanmax(y_m))
+        if best < 0:
+            continue
+        run_records.append({'elem': elem, 'tm': tm, 'dist': dist,
+                            'curve': interp, 'best': best})
+
+    if not run_records:
+        print('plot_discovery_curve_product_single: no data found; skipping.')
+        return
+
+    print(f'Product mode (single seed): {len(run_records)} starting materials.')
+
+    # Random baseline using product reward (gamma=1: r_Ehull × r_DOS)
+    r_ehull_arr = design_space['e_above_hull'].apply(ehull_reward).values
+    r_dos_arr = design_space['r_DOS'].values
+    product_scores = r_ehull_arr * r_dos_arr
+    rng = np.random.default_rng(0)
+    N = len(product_scores)
+    rand_mat = np.empty((N_RANDOM_REPS, X_MAX))
+    for rep in range(N_RANDOM_REPS):
+        perm = np.arange(N)
+        rng.shuffle(perm)
+        rand_mat[rep] = np.maximum.accumulate(product_scores[perm[:X_MAX]])
+    rand_p50 = np.percentile(rand_mat, 50, axis=0)
+    rand_p25 = np.percentile(rand_mat, 25, axis=0)
+    rand_p75 = np.percentile(rand_mat, 75, axis=0)
+
+    max_dist = max(r['dist'] for r in run_records)
+    cmap = plt.colormaps['RdBu_r']
+
+    fig, ax = plt.subplots(figsize=(3, 3))
+    ax.fill_between(x_grid, rand_p25, rand_p75, color='#888888', alpha=0.20,
+                    label='Random')
+    ax.plot(x_grid, rand_p50, color='#555555', lw=1.8, linestyle='--',
+            label='_nolegend_')
+
+    for rec in sorted(run_records, key=lambda r: -r['dist']):
+        c = cmap(rec['dist'] / max(max_dist, 1))
+        valid = ~np.isnan(rec['curve'])
+        if not valid.any():
+            continue
+        ax.plot(x_grid[valid], rec['curve'][valid], color=c, lw=1.0, alpha=0.85)
+
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0, vmax=max_dist))
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=ax, pad=0.02, shrink=0.85)
+    cbar.set_label('Edit distance to\nglobal best', fontsize=8)
+    cbar.ax.tick_params(labelsize=7)
+
+    ax.set_xscale('log')
+    ax.set_xlabel('Iterations', fontsize=10)
+    ax.set_ylabel(r'Best product reward ($r_{E_\mathrm{Hull}} \times r_\mathrm{DOS}$)',
+                  fontsize=9)
+    ax.tick_params(labelsize=9)
+    ax.legend(fontsize=8, frameon=False, loc='lower right')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    fig.tight_layout()
+
+    figures_dir = study_dir / 'figures'
+    figures_dir.mkdir(exist_ok=True)
+    fig_path = figures_dir / 'discovery_curve_edit_distance_product_single_ms3.png'
+    fig.savefig(fig_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f'Saved figure: {fig_path}')
+
+
+def plot_move_step_comparison(study_dir, design_space, dos_rewards, global_ranks):
+    """Compare +1 move (additive search) vs +3 move (multiplicative search) on the
+    multiplicative metric: avg global rank of top-15 compounds, per starting material.
+
+    For +1 move runs: evaluate all_compounds.csv retroactively on the product reward.
+    For +3 move runs: use product_mode (which searched with multiplicative reward).
+    """
+    n_space = len(design_space)
+
+    def top15_mult_rank(csv_path):
+        """Return avg global rank of top-15 by multiplicative reward from one run."""
+        if not csv_path.exists():
+            return None
+        df = pd.read_csv(csv_path)
+        if 'name' not in df.columns and 'formula' in df.columns:
+            df = df.rename(columns={'formula': 'name'})
+        df = df.drop_duplicates(subset=['name'], keep='first').reset_index(drop=True)
+        df['r_DOS'] = df['name'].apply(lambda n: _lookup_dos(n, dos_rewards))
+        df['product'] = (df['e_above_hull'].apply(ehull_reward)
+                         * (NORMALIZED_GAMMA * df['r_DOS']))
+        df = df.sort_values('product', ascending=False).reset_index(drop=True)
+        top15 = df.head(15)
+        ranks = [global_ranks.get(_decompose(r['name']), n_space + 1)
+                 for _, r in top15.iterrows()]
+        return float(np.mean(ranks))
+
+    # Map each (elem, tm) to its +1 move run directory
+    move1_lookup = {(e, t): d for e, t, d in MCTS_RUNS}
+
+    points_1 = []    # (dist, avg_rank) for +1 move additive (retroactive product eval)
+    points_3 = []    # (dist, avg_rank) for +3 move product search
+    points_ms1 = []  # (dist, avg_rank) for +1 move product search (product_mode_g1_ms1)
+
+    for elem, tm in EXTENDED_MCTS_RUNS:
+        dist = edit_distance(elem, tm)
+
+        # +1 move additive: single run from original MCTS_RUNS, retroactive product eval
+        # Skip La — it is excluded from the lanthanide+U design space so its rank is invalid.
+        if elem == 'La':
+            pass
+        else:
+            subdir = move1_lookup.get((elem, tm))
+            if subdir is not None:
+                base = study_dir / subdir if subdir else study_dir
+                csv1 = base / f'{elem}_start' / 'all_compounds.csv'
+            else:
+                csv1 = Path('/nonexistent')
+            rank1 = top15_mult_rank(csv1)
+            if rank1 is not None:
+                points_1.append((dist, rank1))
+
+        # +3 move product: pool all product_mode_g1 seeds (move-step=3)
+        run_dirs = [study_dir / 'product_mode_g1' / f'{elem}_{tm}_s{s}'
+                    for s in range(N_EXTENDED_SEEDS)]
+        rank3 = _top15_avg_rank(run_dirs, dos_rewards, global_ranks, n_space)
+        if rank3 is not None:
+            points_3.append((dist, rank3))
+
+        # +1 move product: pool all product_mode_g1_ms1 seeds (move-step=1)
+        run_dirs_ms1 = [study_dir / 'product_mode_g1_ms1' / f'{elem}_{tm}_s{s}'
+                        for s in range(N_EXTENDED_SEEDS)]
+        rank_ms1 = _top15_avg_rank(run_dirs_ms1, dos_rewards, global_ranks, n_space)
+        if rank_ms1 is not None:
+            points_ms1.append((dist, rank_ms1))
+
+    if not points_1 and not points_3 and not points_ms1:
+        print('plot_move_step_comparison: no data; skipping.')
+        return
+
+    # Print summary stats
+    r1 = [p[1] for p in points_1]
+    r3 = [p[1] for p in points_3]
+    rms1 = [p[1] for p in points_ms1]
+    if r1:
+        print(f'\n+1 move (additive, retroactive mult eval): n={len(r1)}, '
+              f'mean rank={np.mean(r1):.1f}, median={np.median(r1):.1f}')
+    if r3:
+        print(f'+3 move (product search):                  n={len(r3)}, '
+              f'mean rank={np.mean(r3):.1f}, median={np.median(r3):.1f}')
+    if rms1:
+        print(f'+1 move (product search):                  n={len(rms1)}, '
+              f'mean rank={np.mean(rms1):.1f}, median={np.median(rms1):.1f}')
+
+    fig, ax = plt.subplots(figsize=(3.5, 3))
+
+    for label, points, color, marker in [
+        ('+1 move (additive)', points_1, '#D6604D', 'o'),
+        ('+3 move (product)', points_3, '#2166AC', 's'),
+        ('+1 move (product)', points_ms1, '#4DAC26', '^'),
+    ]:
+        if not points:
+            continue
+        dists = np.array([p[0] for p in points])
+        ranks = np.array([p[1] for p in points])
+        ax.scatter(dists, ranks, color=color, marker=marker,
+                   s=25, alpha=0.6, linewidths=0, label=f'_{label}')
+        unique_dists = sorted(set(dists))
+        med_ranks = [np.median(ranks[dists == d]) for d in unique_dists]
+        ax.plot(unique_dists, med_ranks, color=color, lw=1.5,
+                marker=marker, markersize=5, label=label)
+
+    ax.invert_yaxis()
+    # Cap y-axis at the design-space size so outliers don't compress the interesting range.
+    all_ranks = ([p[1] for p in points_1] + [p[1] for p in points_3]
+                 + [p[1] for p in points_ms1])
+    y_max = min(n_space, max(all_ranks) * 1.1) if all_ranks else n_space
+    ax.set_ylim(bottom=y_max, top=0)
+    ax.set_xlabel('Edit distance to global best', fontsize=10)
+    ax.set_ylabel('Avg. global rank (top-15)', fontsize=10)
+    ax.tick_params(labelsize=9)
+    ax.legend(fontsize=8, frameon=False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    fig.tight_layout()
+
+    figures_dir = study_dir / 'figures'
+    figures_dir.mkdir(exist_ok=True)
+    fig_path = figures_dir / 'move_step_comparison.png'
     fig.savefig(fig_path, dpi=300, bbox_inches='tight')
     plt.close(fig)
     print(f'Saved figure: {fig_path}')
@@ -568,6 +1199,17 @@ def main():
 
     # --- Extended-mode figure (generated if data exists) ---
     plot_discovery_curve_extended(study_dir, design_space, dos_rewards)
+
+    # --- Product-mode figures (generated if data exists) ---
+    plot_discovery_curve_product(study_dir, design_space, dos_rewards,
+                                  subdir='product_mode_g1', suffix='ms3')
+    plot_discovery_curve_product(study_dir, design_space, dos_rewards,
+                                  subdir='product_mode_g1_ms1', suffix='ms1')
+    plot_discovery_curve_product_single(study_dir, design_space, dos_rewards)
+    plot_discovery_curve_ms1_vs_ms3(study_dir, design_space, dos_rewards)
+    plot_ehull_vs_rdos_product(study_dir, design_space, dos_rewards)
+    plot_edit_distance_vs_rank(study_dir, design_space, dos_rewards, global_ranks)
+    plot_move_step_comparison(study_dir, design_space, dos_rewards, global_ranks)
 
 
 if __name__ == '__main__':

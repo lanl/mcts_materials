@@ -148,11 +148,14 @@ def build_parser(config: Optional[dict] = None) -> argparse.ArgumentParser:
     parser.add_argument('--exploration-constant', '-c', type=float, default=0.1,
                        help='Exploration constant for UCB calculation (default: 0.1)')
     parser.add_argument('--rollout-method', type=str, default='ehull',
-                       choices=['ehull', 'ehull_rdos', 'rdos'],
+                       choices=['ehull', 'ehull_rdos', 'ehull_rdos_product', 'rdos'],
                        help='Rollout method: ehull (tanh-transformed energy above hull only; MACE + Materials Project, no DFT/DOSCAR data needed), '
                             'ehull_rdos (ehull + rDOS, weighted by --beta/--gamma; requires doscar_peaks_data_with_U.csv), '
+                            'ehull_rdos_product (multiplicative: ehull_reward * (gamma*r_DOS); requires doscar_peaks_data_with_U.csv; '
+                            'unstable compounds yield a negative reward regardless of DOS quality), '
                             'or rdos (rDOS only, computed in real time from doscar_peaks_data_with_U.csv; no MACE/Materials Project needed). '
-                            'Reward: ehull -> ehull_reward(e_above_hull); ehull_rdos -> beta*ehull_reward(e_above_hull) + gamma*r_DOS; rdos -> r_DOS')
+                            'Reward: ehull -> ehull_reward(e_above_hull); ehull_rdos -> beta*ehull_reward(e_above_hull) + gamma*r_DOS; '
+                            'ehull_rdos_product -> ehull_reward(e_above_hull) * (gamma*r_DOS); rdos -> r_DOS')
     parser.add_argument('--beta', type=float, default=1.0,
                        help='Weight for the E_hull reward when using ehull_rdos (default: 1.0)')
     parser.add_argument('--gamma', type=float, default=0.0001,
@@ -234,7 +237,7 @@ def main():
         logger.info(f"Random seed set to: {args.seed}")
 
     # Validate that MP API key is provided when needed
-    methods_requiring_api_key = ['ehull', 'ehull_rdos']
+    methods_requiring_api_key = ['ehull', 'ehull_rdos', 'ehull_rdos_product']
     if args.rollout_method in methods_requiring_api_key and args.mp_api_key is None:
         logger.error(f"--mp-api-key is required when using rollout method '{args.rollout_method}'")
         logger.info(f"   Energy above hull calculations require Materials Project API access")
@@ -244,7 +247,7 @@ def main():
 
     # Check if DOSCAR peaks file exists for methods that need rDOS (rewards are
     # always computed in real time from raw peak data - no precomputed cache)
-    if args.rollout_method in ['ehull_rdos', 'rdos']:
+    if args.rollout_method in ['ehull_rdos', 'ehull_rdos_product', 'rdos']:
         peaks_file = Path("doscar_peaks_data_with_U.csv")
         if not peaks_file.exists():
             logger.error(f"DOSCAR peaks file (doscar_peaks_data_with_U.csv) not found for rollout method {args.rollout_method}")
@@ -305,7 +308,7 @@ def main():
 
     # Load DOSCAR rewards if this rollout method uses rDOS
     doscar_lookup = None
-    if args.rollout_method in ['ehull_rdos', 'rdos']:
+    if args.rollout_method in ['ehull_rdos', 'ehull_rdos_product', 'rdos']:
         logger.info(f"\n2.5. Loading DOSCAR rewards...")
         try:
             doscar_lookup = DoscarRewardLookup()
@@ -368,6 +371,9 @@ def main():
     if args.rollout_method == 'ehull_rdos':
         logger.info(f"   Beta (E_hull weight, ehull_reward = -tanh(120*(E_hull-0.05))): {args.beta}")
         logger.info(f"   Gamma (rDOS weight): {args.gamma}")
+    elif args.rollout_method == 'ehull_rdos_product':
+        logger.info(f"   Gamma (rDOS weight): {args.gamma}")
+        logger.info(f"   Reward = ehull_reward(E_hull) * (gamma * r_DOS)  [multiplicative]")
     logger.info(f"   This may take several minutes depending on cache hit rate...")
 
     try:
