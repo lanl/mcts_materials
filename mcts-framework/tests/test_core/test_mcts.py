@@ -202,6 +202,67 @@ async def test_rollout_depth_zero_is_pure_node_value():
     assert reward == -3.0
 
 
+# --- rollout_aggregation + max-along-walk --------------------------------
+
+
+def test_invalid_rollout_aggregation_rejected():
+    import pytest as _pytest
+    with _pytest.raises(ValueError):
+        make_mcts(rollout_aggregation="median")
+
+
+@pytest.mark.asyncio
+async def test_own_reward_is_depth0_regardless_of_aggregation():
+    """own_reward is always the undiscounted depth-0 value, for max and mean."""
+    for agg in ("max", "mean"):
+        mcts = make_mcts(target=0, start=3, n_rollout=5, rollout_depth=2,
+                         rollout_aggregation=agg)
+        await mcts._simulate(mcts.root)
+        # start=3, target=0 -> own distance 3 -> own_reward -3
+        assert mcts.root.own_reward == -3.0
+
+
+@pytest.mark.asyncio
+async def test_max_along_walk_returns_best_step():
+    """
+    A depth>0 rollout scores every step and returns the max. From start=3
+    toward target=0, a walk can reach 0 (reward 0) within a couple of steps;
+    max-along-walk should surface a step reward >= the endpoint's.
+    """
+    mcts = make_mcts(target=0, start=3, n_rollout=1, rollout_depth=5,
+                     rollout_aggregation="max", seed=1)
+    # _rollout_sample returns the max reward along one random walk.
+    r = await mcts._rollout_sample(mcts.root.material)
+    # Rewards are -distance <= 0; best possible along a walk that can reach 0.
+    assert r <= 0.0
+    # Over several walks, at least one should hit the target (reward 0).
+    best = float("-inf")
+    for _ in range(20):
+        best = max(best, await mcts._rollout_sample(mcts.root.material))
+    assert best == 0.0
+
+
+@pytest.mark.asyncio
+async def test_mean_aggregation_differs_from_max():
+    """
+    Under 'mean', _simulate returns the plain average of all samples (own +
+    undiscounted extras); under 'max' it returns the maximum. On the same
+    seed/state the mean must be <= the max, and typically strictly less when
+    the samples aren't all equal.
+    """
+    common = dict(target=0, start=5, n_rollout=6, rollout_depth=2, seed=0)
+
+    mcts_mean = make_mcts(rollout_aggregation="mean", **common)
+    mean_val = await mcts_mean._simulate(mcts_mean.root)
+
+    mcts_max = make_mcts(rollout_aggregation="max", **common)
+    max_val = await mcts_max._simulate(mcts_max.root)
+
+    assert mean_val <= max_val
+    # own_reward (depth-0) is identical regardless of aggregation.
+    assert mcts_mean.root.own_reward == mcts_max.root.own_reward == -5.0
+
+
 # --- Results helpers -----------------------------------------------------
 
 

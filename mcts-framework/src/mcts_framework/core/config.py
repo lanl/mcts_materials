@@ -74,6 +74,12 @@ class MCTSConfig(BaseModel):
 
     rollout_depth: int = Field(1, ge=0, description="Random steps per rollout sample")
     n_rollout: int = Field(5, ge=1, description="Rollout samples per expansion")
+    rollout_aggregation: Literal["max", "mean"] = Field(
+        "max",
+        description="Combine a node's n_rollout samples: 'max' (optimistic; "
+        "extra samples discounted by 0.9**rollout_depth) or 'mean' (unbiased "
+        "average of undiscounted samples)",
+    )
 
     seed: Optional[int] = Field(None, description="Random seed for reproducibility")
     output_dir: str = Field("mcts_results", description="Output directory")
@@ -101,6 +107,14 @@ class IntermetallicConfig(BaseModel):
             "'experimental'); "
             "full_f_block (Ce-Lu + Th-Pu, +/-1 plus vertical Ln<->An analogs)."
         ),
+    )
+
+    move_step: int = Field(
+        1,
+        ge=1,
+        description="Max positions a substitution may jump along the "
+        "transition-metal / Group IV / lanthanide axes (1 = adjacent only; "
+        "3 = extended-range exploration)",
     )
 
     rollout_method: Literal["ehull", "ehull_rdos", "rdos"] = "ehull"

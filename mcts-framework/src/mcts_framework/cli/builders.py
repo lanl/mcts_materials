@@ -58,6 +58,7 @@ def build_mcts(config: Config) -> MCTS:
         termination_limit=config.mcts.termination_limit,
         rollout_depth=config.mcts.rollout_depth,
         n_rollout=config.mcts.n_rollout,
+        rollout_aggregation=config.mcts.rollout_aggregation,
         seed=config.mcts.seed,
     )
 
@@ -77,7 +78,7 @@ def _build_intermetallic(config: Config) -> Tuple[object, object, "PropertyEvalu
     atoms = read(ic.structure_path)
     root = IntermetallicStructure(atoms)
 
-    moves = PeriodicTableMoves(f_block_mode=ic.f_block_mode)
+    moves = PeriodicTableMoves(f_block_mode=ic.f_block_mode, move_step=ic.move_step)
     evaluator = MaceEvaluator(cache_path=ic.cache_path, mp_api_key=ic.mp_api_key)
 
     # DOSCAR lookup only needed for rdos / ehull_rdos.

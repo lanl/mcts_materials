@@ -30,14 +30,19 @@ class PeriodicTableMoves(MoveGenerator[IntermetallicStructure]):
     when the structure has no f-block site.
     """
 
-    def __init__(self, f_block_mode: str = "u_only"):
+    def __init__(self, f_block_mode: str = "u_only", move_step: int = 1):
         """
         Args:
             f_block_mode: One of the canonical f-block modes understood by
                 elements.f_block_moves (u_only, lanthanides_u,
                 lanthanides_u_extended, lanthanides_u_no_wrap, full_f_block).
+            move_step: Max positions a single substitution may jump along the
+                transition-metal / Group IV / lanthanide axes (default 1 =
+                adjacent only; e.g. 3 gives extended-range exploration). Fixed
+                cross-period metal jumps and full_f_block are unaffected.
         """
         self.f_block_mode = f_block_mode
+        self.move_step = move_step
 
     def generate_moves(
         self, material: IntermetallicStructure
@@ -55,11 +60,13 @@ class PeriodicTableMoves(MoveGenerator[IntermetallicStructure]):
         for z in present:
             site = elements.classify_site(int(z))
             if site == "metal":
-                metal_axis = elements.metal_moves(int(z))
+                metal_axis = elements.metal_moves(int(z), self.move_step)
             elif site == "group_iv":
-                giv_axis = elements.group_iv_moves(int(z))
+                giv_axis = elements.group_iv_moves(int(z), self.move_step)
             elif site == "f_block":
-                fblock_axis = list(elements.f_block_moves(int(z), self.f_block_mode))
+                fblock_axis = list(
+                    elements.f_block_moves(int(z), self.f_block_mode, self.move_step)
+                )
 
         children: List[IntermetallicStructure] = []
         for metal in metal_axis:

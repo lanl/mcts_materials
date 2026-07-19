@@ -64,6 +64,7 @@ class MCTS(Generic[M]):
         termination_limit: int = 60,
         rollout_depth: int = 1,
         n_rollout: int = 5,
+        rollout_aggregation: str = "max",
         seed: Optional[int] = None,
     ):
         """
@@ -80,12 +81,28 @@ class MCTS(Generic[M]):
                 sample beyond the node itself (depth 0 = evaluate the node).
             n_rollout: Total rollout samples per newly expanded node,
                 including the mandatory depth-0 sample.
+            rollout_aggregation: How to combine a node's n_rollout reward
+                samples into its value:
+                - 'max' (default): optimistic maximum. The extra (depth>0)
+                  samples are discounted by 0.9**rollout_depth before
+                  comparison, acting as a confidence penalty on speculative
+                  lookahead relative to the node's own depth-0 reward.
+                - 'mean': plain average of UNDISCOUNTED samples, an unbiased
+                  estimate of expected reward. The depth discount is dropped
+                  here (discounting-then-averaging-by-unweighted-n would just
+                  drag the mean toward zero rather than weight confidence).
             seed: Optional RNG seed for reproducibility.
         """
+        if rollout_aggregation not in ("max", "mean"):
+            raise ValueError(
+                f"rollout_aggregation must be 'max' or 'mean', "
+                f"got {rollout_aggregation!r}"
+            )
         self.exploration_constant = exploration_constant
         self.termination_limit = termination_limit
         self.rollout_depth = rollout_depth
         self.n_rollout = max(1, n_rollout)
+        self.rollout_aggregation = rollout_aggregation
 
         self.root: SearchNode[M] = SearchNode(
             root_material,
@@ -292,41 +309,59 @@ class MCTS(Generic[M]):
 
     async def _simulate(self, node: SearchNode[M]) -> float:
         """
-        Estimate the value of `node` as the max reward over n_rollout samples.
+        Estimate the value of `node` by aggregating n_rollout reward samples.
 
-        Sample 0 always evaluates the node itself (depth 0) and records its
-        properties on the node. Additional samples perform up to
-        rollout_depth random moves and are discounted by 0.9**depth,
-        mirroring the validated mcts_crystal behavior.
+        Sample 0 always evaluates the node itself (depth 0), records its
+        properties, and sets node.own_reward (the node's true material value,
+        which stays independent of aggregation). The remaining n_rollout-1
+        samples are random "max-along-walk" rollouts (see _rollout_sample).
+
+        The samples are combined per self.rollout_aggregation:
+        - 'max': the extra samples are discounted by 0.9**rollout_depth (a
+          confidence penalty on speculative lookahead), then the maximum over
+          all samples is taken.
+        - 'mean': the extra samples are left undiscounted and the plain mean
+          over all samples is returned (unbiased expected-reward estimate).
+
+        The returned value is what backpropagation propagates; node.own_reward
+        is always the undiscounted depth-0 reward regardless of aggregation.
         """
         # Depth-0 sample: evaluate the node itself and cache its properties.
         base_props = await self.property_evaluator.evaluate(node.material)
         node.properties = base_props
         own = self.reward_function.compute_reward(base_props)
-        # Record THIS node's own reward (its true material value), distinct
-        # from the subtree-best that backpropagation will accumulate.
         node.own_reward = own
 
-        best = own
-        # Additional discounted random rollout samples.
-        for _ in range(self.n_rollout - 1):
-            reward = await self._rollout_sample(node.material)
-            if reward > best:
-                best = reward
+        samples = [own]
 
-        return best
+        # 'max' discounts the extra samples; 'mean' leaves them undiscounted.
+        scale = 0.9 ** self.rollout_depth if self.rollout_aggregation == "max" else 1.0
+        for _ in range(self.n_rollout - 1):
+            samples.append(scale * await self._rollout_sample(node.material))
+
+        if self.rollout_aggregation == "max":
+            return max(samples)
+        return sum(samples) / len(samples)  # 'mean'
 
     async def _rollout_sample(self, material: M) -> float:
         """
-        One random rollout: take up to rollout_depth random moves, evaluate
-        the endpoint, and discount by 0.9**steps_taken.
+        One "max-along-walk" random rollout.
+
+        Take up to rollout_depth independent random moves and evaluate the
+        reward at EVERY intermediate composition, returning the maximum seen
+        along the walk. Every composition the walk passes through is a valid
+        candidate, so scoring only the endpoint would discard information;
+        max-along-walk extracts up to `rollout_depth` candidate evaluations
+        per walk instead of one. Returns the node's own reward if no move is
+        possible.
 
         Rollout samples are NOT added to the tree and do NOT reserve
         identifiers - they only probe reward, so their materials remain
-        available for real expansion later.
+        available for real expansion later. The depth discount (for 'max'
+        aggregation) is applied by the caller, not here.
         """
         current = material
-        steps = 0
+        step_rewards: List[float] = []
 
         for _ in range(self.rollout_depth):
             moves = self.move_generator.generate_moves(current)
@@ -334,11 +369,15 @@ class MCTS(Generic[M]):
             if not moves:
                 break
             current = self._rng.choice(moves)
-            steps += 1
+            props = await self.property_evaluator.evaluate(current)
+            step_rewards.append(self.reward_function.compute_reward(props))
 
-        props = await self.property_evaluator.evaluate(current)
-        reward = self.reward_function.compute_reward(props)
-        return reward * (0.9 ** steps)
+        if not step_rewards:
+            # No move was possible; fall back to the starting material's reward.
+            props = await self.property_evaluator.evaluate(material)
+            return self.reward_function.compute_reward(props)
+
+        return max(step_rewards)
 
     # ------------------------------------------------------------------ #
     # Phase 4: Backpropagation

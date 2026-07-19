@@ -26,6 +26,13 @@ def test_mcts_config_defaults():
     assert cfg.exploration_constant == 0.1
     assert cfg.selection_mode == "ucb1"
     assert cfg.n_rollout == 5
+    assert cfg.rollout_aggregation == "max"  # matches mcts_crystal default
+
+
+def test_mcts_config_rollout_aggregation():
+    assert MCTSConfig(rollout_aggregation="mean").rollout_aggregation == "mean"
+    with pytest.raises(ValidationError):
+        MCTSConfig(rollout_aggregation="median")
 
 
 def test_mcts_config_rejects_unknown_field():
@@ -58,6 +65,25 @@ def test_intermetallic_rdos_needs_no_api_key():
         doscar_data_path="doscar.csv",
     )
     assert cfg.rollout_method == "rdos"
+
+
+def test_intermetallic_move_step():
+    """move_step defaults to 1 and must be >= 1."""
+    cfg = IntermetallicConfig(
+        structure_path="foo.cif", rollout_method="rdos",
+        doscar_data_path="d.csv",
+    )
+    assert cfg.move_step == 1
+    cfg3 = IntermetallicConfig(
+        structure_path="foo.cif", rollout_method="rdos",
+        doscar_data_path="d.csv", move_step=3,
+    )
+    assert cfg3.move_step == 3
+    with pytest.raises(ValidationError):
+        IntermetallicConfig(
+            structure_path="foo.cif", rollout_method="rdos",
+            doscar_data_path="d.csv", move_step=0,
+        )
 
 
 def test_intermetallic_ehull_requires_api_key():

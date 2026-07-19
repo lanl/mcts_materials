@@ -15,6 +15,7 @@ mcts:
   selection_mode: ucb1
   rollout_depth: 1
   n_rollout: 5
+  rollout_aggregation: max      # max (optimistic, discounts extra samples) | mean
   seed: 0
   output_dir: mcts_results_molecule
 

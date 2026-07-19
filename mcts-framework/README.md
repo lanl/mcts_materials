@@ -162,6 +162,18 @@ material and its reward are always self-consistent.
 The intermetallic rewards preserve the validated constants from `mcts_crystal`:
 `ehull_reward = -tanh(120·(E_hull − 0.05))` and rDOS Gaussian width σ = 0.5 eV.
 
+### Search behavior (matches current `mcts_crystal`)
+- **`move_step`** (intermetallic): max positions a substitution may jump along
+  the transition-metal / Group IV / lanthanide axes (default 1 = adjacent;
+  3 = extended-range). Unifies the old `lanthanides_u` / `lanthanides_u_extended`
+  distinction.
+- **`rollout_aggregation`** (core): how a node's `n_rollout` samples combine —
+  `max` (default; extra samples discounted by `0.9**rollout_depth`) or `mean`
+  (unbiased average of undiscounted samples).
+- **max-along-walk rollouts**: a depth>0 rollout scores every composition along
+  the random walk and returns the max, extracting up to `rollout_depth`
+  candidate evaluations per walk instead of only the endpoint.
+
 ## Development
 
 ```bash

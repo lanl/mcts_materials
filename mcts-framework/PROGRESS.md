@@ -19,9 +19,29 @@ regardless.
 
 ## Current status
 
-Test suite: **136 passed, 2 skipped** (`pytest` from the `mcts-framework/` dir).
+Test suite: **149 passed, 2 skipped** (`pytest` from the `mcts-framework/` dir).
 The 2 skips are RDKit-dependent molecule tests (RDKit not installed in the
 current env — see caveats).
+
+### Upstream sync (adopted latest mcts_crystal development)
+
+After rebasing `refactor` onto `origin/main` (17 upstream commits), the
+framework was updated to match the *current* mcts_crystal search behavior:
+
+- **`move_step`** (intermetallic): generalizes the metal/Group IV/lanthanide
+  move range (default 1 = adjacent; larger = extended). Unifies
+  `lanthanides_u` (step 1) and `lanthanides_u_extended` (step 3). Lives in
+  `intermetallic/elements.py` move fns + `PeriodicTableMoves`; move fns now
+  return SORTED lists (same element sets as before, matching upstream).
+- **`rollout_aggregation`** (core): `max` (default; extra samples discounted
+  by `0.9**rollout_depth`) or `mean` (unbiased average, undiscounted). In
+  `core/mcts.py` + `MCTSConfig`.
+- **max-along-walk rollouts** (core): depth>0 rollouts now score every step of
+  the random walk and return the max, not just the endpoint.
+- Defaults chosen to match mcts_crystal exactly (move_step=1,
+  rollout_aggregation='max', max-along-walk). `node.own_reward` remains the
+  undiscounted depth-0 value regardless of aggregation (preserves the
+  global-best-consistency fix).
 
 ### Done
 - **Core** (`src/mcts_framework/core/`): Material, MoveGenerator,

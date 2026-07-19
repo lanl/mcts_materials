@@ -34,6 +34,8 @@ MCTS core:
 | `rollout_method="rdos"` | `RdosReward(doscar)` |
 | `node.e_form`, `node.e_above_hull` | `node.properties["e_form"]`, `node.properties["e_above_hull"]` |
 | `f_block_mode="experimental"` | `f_block_mode="lanthanides_u_no_wrap"` (old name still accepted as an alias) |
+| `--move-step` / `move_step` (node) | `PeriodicTableMoves(move_step=...)` / `intermetallic.move_step` in config |
+| `--rollout-aggregation` (`max`/`mean`) | `MCTS(rollout_aggregation=...)` / `mcts.rollout_aggregation` in config |
 | `python run_mcts.py --rollout-method ehull ...` | `mcts-run run --config config.yaml` |
 
 \* The DOSCAR valence-suffix lookup bug is fixed in the new code; results for
