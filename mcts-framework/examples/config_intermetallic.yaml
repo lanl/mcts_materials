@@ -1,0 +1,37 @@
+# Example configuration: intermetallic crystal-structure search.
+#
+# Run with:
+#   mcts-run run --config examples/config_intermetallic.yaml
+#
+# As shipped this uses rollout_method: rdos, which needs only the [intermetallic]
+# extra (ase, spglib), the bundled CIF, and a DOSCAR peaks CSV - NO Materials
+# Project API key. To search by thermodynamic stability instead, switch
+# rollout_method to 'ehull' or 'ehull_rdos' and provide mp_api_key (these also
+# pull in mace-torch, pymatgen, matbench-discovery for live energy calcs).
+
+material_type: intermetallic
+
+mcts:
+  iterations: 1000
+  exploration_constant: 0.1
+  termination_limit: 60
+  selection_mode: ucb1          # ucb1 | puct | epsilon_greedy | boltzmann
+  rollout_depth: 1
+  n_rollout: 5
+  seed: 0
+  output_dir: mcts_results_intermetallic
+
+intermetallic:
+  structure_path: examples/mat_Pb6U1W6_sg191.cif
+  f_block_mode: u_only          # u_only | lanthanides_u | lanthanides_u_extended
+                                # | lanthanides_u_no_wrap | full_f_block
+                                # ('experimental' is accepted as a deprecated
+                                #  alias for lanthanides_u_no_wrap)
+  rollout_method: rdos          # rdos (no API key) | ehull | ehull_rdos
+  beta: 1.0                     # E_hull weight (ehull_rdos only)
+  gamma: 0.0001                 # rDOS weight  (ehull_rdos only)
+
+  # Data / credentials:
+  doscar_data_path: doscar_peaks_data_with_U.csv  # required for rdos/ehull_rdos
+  mp_api_key: null              # required for ehull/ehull_rdos (not rdos)
+  cache_path: null              # optional MACE energy cache CSV
