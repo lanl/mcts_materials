@@ -1,6 +1,7 @@
 {
   "mp_api_key": "YOUR_MATERIALS_PROJECT_API_KEY",
   "rollout_method": "ehull",
+  "_rollout_method_choices": "ehull | ehull_rdos | ehull_rdos_product | rdos",
   "iterations": 1000,
   "beta": 1.0,
   "gamma": 0.0001,

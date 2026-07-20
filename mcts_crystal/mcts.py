@@ -273,9 +273,9 @@ class MCTS:
             rollout_depth: Depth of rollout simulation
             n_rollout: Number of rollout simulations
             energy_calculator: Energy calculator instance
-            rollout_method: Rollout evaluation method ('ehull', 'ehull_rdos', or 'rdos')
+            rollout_method: Rollout evaluation method ('ehull', 'ehull_rdos', 'ehull_rdos_product', or 'rdos')
             beta: Weight for E_hull reward when using 'ehull_rdos' method (default: 1.0)
-            gamma: Weight for rDOS reward when using 'ehull_rdos' method (default: 0.0001)
+            gamma: Weight for rDOS reward when using 'ehull_rdos' or 'ehull_rdos_product' method (default: 0.0001)
             doscar_lookup: DoscarRewardLookup instance for DOSCAR rewards
             n_workers: Number of worker threads for the n_rollout samples
                 (default: 1, i.e. sequential, identical to prior behavior)
@@ -329,6 +329,9 @@ class MCTS:
         elif rollout_method == 'ehull_rdos':
             # E_hull (tanh-transformed) + rDOS, requires doscar_peaks_data_with_U.csv
             mode = f'ehull_rdos_{beta}_{gamma}'
+        elif rollout_method == 'ehull_rdos_product':
+            # r_Ehull * (gamma * r_DOS): multiplicative combination
+            mode = f'ehull_rdos_product_{gamma}'
         elif rollout_method == 'rdos':
             # rDOS only, requires doscar_peaks_data_with_U.csv, no MACE/Materials Project needed
             mode = 'rdos'
@@ -477,9 +480,9 @@ class MCTS:
             selection_mode: Child-selection strategy for the selection phase.
                 One of 'ucb1' (default), 'epsilon_greedy', 'boltzmann', 'puct',
                 or 'hybrid'. See select_node() for details on each.
-            rollout_method: Rollout evaluation method ('ehull', 'ehull_rdos', or 'rdos')
+            rollout_method: Rollout evaluation method ('ehull', 'ehull_rdos', 'ehull_rdos_product', or 'rdos')
             beta: Weight for E_hull reward when using 'ehull_rdos' method (default: 1.0)
-            gamma: Weight for rDOS reward when using 'ehull_rdos' method (default: 0.0001)
+            gamma: Weight for rDOS reward when using 'ehull_rdos' or 'ehull_rdos_product' method (default: 0.0001)
             doscar_lookup: DoscarRewardLookup instance for DOSCAR rewards
             rollout_aggregation: How to combine a node's n_rollout reward samples -
                 'max' (default) or 'mean'. See expansion_simulation() for details.

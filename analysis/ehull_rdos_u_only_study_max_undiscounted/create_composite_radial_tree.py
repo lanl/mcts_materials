@@ -33,6 +33,9 @@ from synthesized_compounds import SYNTHESIZED_COMPOUNDS
 # 1 / (max raw r_DOS across the 108 U-only compounds, U-Pb-Mn / Mn6Pb6U =
 # 2516.1664410449775) - see generate_figures.py's NORMALIZED_GAMMA.
 DEFAULT_GAMMA = 1.0 / 2516.1664410449775
+# Product-mode gamma (raw r_DOS, not normalised) and its composite ceiling.
+PRODUCT_GAMMA = 1.0
+PRODUCT_VMAX = 1686.75  # UTi6Sn6 product reward — anchors colorbar at 1.0
 
 
 # Element categories
@@ -80,8 +83,13 @@ def reorder_formula_unicode(formula):
 
 
 def compute_composite(e_hull, r_dos, beta=1.0, gamma=DEFAULT_GAMMA):
-    """Compute composite reward (E_form is not part of the reward)."""
+    """Additive composite: beta*r_Ehull + gamma*r_DOS."""
     return beta * ehull_reward(e_hull) + gamma * r_dos
+
+
+def compute_composite_product(e_hull, r_dos, **_):
+    """Multiplicative composite: r_Ehull × (PRODUCT_GAMMA × r_DOS)."""
+    return ehull_reward(e_hull) * (PRODUCT_GAMMA * float(r_dos))
 
 
 def count_descendants(G, node):
@@ -228,7 +236,7 @@ def _spread_nodes(pos, root, min_dist=2.0, max_iters=600):
     return {k: tuple(v) for k, v in pos.items()}
 
 
-def build_tree_data(mcts):
+def build_tree_data(mcts, comp_fn=compute_composite):
     """Build tree data from MCTS, computing composite for each node."""
     tree_data = {}
 
@@ -247,7 +255,7 @@ def build_tree_data(mcts):
 
         composite = None
         if e_hull is not None:
-            composite = compute_composite(e_hull, r_dos)
+            composite = comp_fn(e_hull, r_dos)
 
         tree_data[node_id] = {
             "formula": formula,
@@ -281,8 +289,21 @@ def main():
                               '(default: this script\'s own directory, i.e. the '
                               'study\'s main run). Figures still always get saved '
                               'into this script\'s figures/ directory.')
+    parser.add_argument('--product', action='store_true',
+                        help='Product-mode: use multiplicative composite r_Ehull×r_DOS '
+                             'with gamma=1.0 (raw DOS). Defaults run-dir to product_mode/seed_0 '
+                             'and saves to product_mode/figures/.')
     args = parser.parse_args()
-    run_dir = Path(args.run_dir) if args.run_dir else script_dir
+    product_mode = args.product
+
+    if args.run_dir:
+        run_dir = Path(args.run_dir)
+    elif product_mode:
+        run_dir = script_dir / 'product_mode' / 'seed_0'
+    else:
+        run_dir = script_dir
+
+    comp_fn = compute_composite_product if product_mode else compute_composite
 
     # Load MCTS pickle
     pkl_path = run_dir / 'mcts_object.pkl'
@@ -308,7 +329,7 @@ def main():
 
     # Build tree data with composite scores
     print("Building tree data...")
-    tree_data = build_tree_data(mcts)
+    tree_data = build_tree_data(mcts, comp_fn=comp_fn)
     print(f"  {len(tree_data)} nodes in tree")
 
     # Build a condensed networkx graph collapsing nodes by unique formula
@@ -353,7 +374,10 @@ def main():
     # Parse top-15 table now so we can force-include those nodes regardless of
     # visit count — if a compound appears in the table it was explored by MCTS
     # and must be visible in the tree.
-    _table_path = Path(__file__).parent / 'tables' / 'top15_u_only.tex'
+    if product_mode:
+        _table_path = Path(__file__).parent / 'product_mode' / 'tables' / 'top15_u_only_product.tex'
+    else:
+        _table_path = Path(__file__).parent / 'tables' / 'top15_u_only.tex'
     _table_keys = set()
     if _table_path.exists():
         with open(_table_path) as _tf:
@@ -434,28 +458,56 @@ def main():
         return d
 
     secondary_edges = set()
-    d5_csv = script_dir / 'd5_start_run' / 'all_compounds.csv'
-    if d5_csv.exists():
-        df_d5 = pd.read_csv(d5_csv)
+    if product_mode:
+        # Inject top-15 compounds found in other seeds (seed_1..4) that are
+        # missing from the primary seed_0 tree.
         existing_fkeys = {_formula_key(n) for n in G.nodes()}
-        for _, row in df_d5.iterrows():
-            formula = str(row['formula'])
-            fkey = _formula_key(formula)
-            if fkey not in _table_keys or fkey in existing_fkeys:
+        for _seed in range(1, 5):
+            _seed_csv = script_dir / 'product_mode' / f'seed_{_seed}' / 'all_compounds.csv'
+            if not _seed_csv.exists():
                 continue
-            e_hull = float(row['e_above_hull'])
-            r_dos = float(row['dos_reward'])
-            comp = compute_composite(e_hull, r_dos)
-            vc = int(row['visit_count'])
-            G.add_node(formula, formula=formula, composite=comp, e_hull=e_hull,
-                       r_dos=r_dos, visit_count=vc, q_per_n=float(row['best_reward']))
-            existing_fkeys.add(fkey)
-            nearest = min((n for n in G.nodes() if n != formula),
-                          key=lambda n: _design_dist(formula, n),
-                          default=root_formula)
-            secondary_edges.add((nearest, formula))
-            G.add_edge(nearest, formula)
-            print(f"  Added from d5_start_run: {formula} -> nearest={nearest}")
+            _df_s = pd.read_csv(_seed_csv)
+            for _, row in _df_s.iterrows():
+                formula = str(row.get('formula', row.get('name', '')))
+                fkey = _formula_key(formula)
+                if fkey not in _table_keys or fkey in existing_fkeys:
+                    continue
+                e_hull = float(row['e_above_hull'])
+                r_dos = float(row.get('dos_reward', row.get('r_DOS', 0.0)))
+                comp = compute_composite_product(e_hull, r_dos)
+                vc = int(row.get('visit_count', 1))
+                G.add_node(formula, formula=formula, composite=comp, e_hull=e_hull,
+                           r_dos=r_dos, visit_count=vc, q_per_n=comp)
+                existing_fkeys.add(fkey)
+                nearest = min((n for n in G.nodes() if n != formula),
+                              key=lambda n: _design_dist(formula, n),
+                              default=root_formula)
+                secondary_edges.add((nearest, formula))
+                G.add_edge(nearest, formula)
+                print(f"  Added from seed_{_seed}: {formula} -> nearest={nearest}")
+    else:
+        d5_csv = script_dir / 'd5_start_run' / 'all_compounds.csv'
+        if d5_csv.exists():
+            df_d5 = pd.read_csv(d5_csv)
+            existing_fkeys = {_formula_key(n) for n in G.nodes()}
+            for _, row in df_d5.iterrows():
+                formula = str(row['formula'])
+                fkey = _formula_key(formula)
+                if fkey not in _table_keys or fkey in existing_fkeys:
+                    continue
+                e_hull = float(row['e_above_hull'])
+                r_dos = float(row['dos_reward'])
+                comp = compute_composite(e_hull, r_dos)
+                vc = int(row['visit_count'])
+                G.add_node(formula, formula=formula, composite=comp, e_hull=e_hull,
+                           r_dos=r_dos, visit_count=vc, q_per_n=float(row['best_reward']))
+                existing_fkeys.add(fkey)
+                nearest = min((n for n in G.nodes() if n != formula),
+                              key=lambda n: _design_dist(formula, n),
+                              default=root_formula)
+                secondary_edges.add((nearest, formula))
+                G.add_edge(nearest, formula)
+                print(f"  Added from d5_start_run: {formula} -> nearest={nearest}")
 
     print(f"  {len(G.nodes())} nodes after trimming (from {len(unique_map)} unique)")
 
@@ -463,8 +515,12 @@ def main():
     # build_tree_data recomputes composite using the current doscar file, which may have
     # drifted since the study was run.  The CSVs store e_above_hull and dos_reward as
     # they were at run time, so we use those as the authoritative source for colors.
-    for _gt_csv in [script_dir / 'all_compounds.csv',
-                    script_dir / 'd5_start_run' / 'all_compounds.csv']:
+    if product_mode:
+        _gt_csvs = sorted((script_dir / 'product_mode').glob('seed_*/all_compounds.csv'))
+    else:
+        _gt_csvs = [script_dir / 'all_compounds.csv',
+                    script_dir / 'd5_start_run' / 'all_compounds.csv']
+    for _gt_csv in _gt_csvs:
         if _gt_csv.exists():
             _df_gt = pd.read_csv(_gt_csv)
             for _, _row in _df_gt.iterrows():
@@ -475,21 +531,23 @@ def main():
                 _rdos = float(_row['dos_reward'])
                 G.nodes[_f]['e_hull'] = _eh
                 G.nodes[_f]['r_dos'] = _rdos
-                G.nodes[_f]['composite'] = compute_composite(_eh, _rdos)
+                G.nodes[_f]['composite'] = comp_fn(_eh, _rdos)
 
     # MCTS ranks and synthesized set for panel (b) annotations.
     # Read both MCTS rank and True Rank from the committed table.
-    table_path = Path(__file__).parent / 'tables' / 'top15_u_only.tex'
+    # Always use product-mode table so coloring and rank labels are consistent.
+    table_path = script_dir / 'product_mode' / 'tables' / 'top15_u_only_product.tex'
     mcts_ranks_from_table = {}   # formula_key -> mcts_rank (label shown on node)
     true_ranks_from_table = {}   # formula_key -> true_rank (kept for reference)
     table_composites = {}        # formula_key -> committed composite value (ground truth)
     if table_path.exists():
         with open(table_path) as _f:
             for _line in _f:
-                # Columns: MCTS Rank & True Rank & Name & gamma*r_dos & r_ehull & Composite & E_hull & Synth
+                # Columns: MCTS & True & Compound & E_Hull & r_Ehull & r_DOS & Product Reward & Synth
+                # E_Hull can be negative, so use [\d.-]+ for that column too.
                 _m = re.match(
-                    r'\s*(\d+)\s*&\s*(\d+)\s*&\s*(.*?)\s*&'     # rank, true_rank, name
-                    r'\s*[\d.]+\s*&\s*[\d.]+\s*&\s*([\d.]+)\s*&',  # skip two cols, capture composite
+                    r'\s*(\d+)\s*&\s*(\d+)\s*&\s*(.*?)\s*&'            # rank, true_rank, name
+                    r'\s*[\d.-]+\s*&\s*[\d.-]+\s*&\s*[\d.]+\s*&\s*([\d.]+)\s*&',  # skip 3, capture Product
                     _line,
                 )
                 if _m:
@@ -507,10 +565,10 @@ def main():
     synth_keys = {_formula_key(s) for s in SYNTHESIZED_COMPOUNDS}
 
     # Compute layout, flip 180 degrees, then resolve any node overlaps.
-    pos = radial_layout(G, root_formula, radius_step=5.0) if root_formula is not None else {}
+    pos = radial_layout(G, root_formula, radius_step=10.0) if root_formula is not None else {}
     pos = {nid: (-x, -y) for nid, (x, y) in pos.items()} if pos else {}
     if pos and root_formula is not None:
-        pos = _spread_nodes(pos, root_formula, min_dist=2.8)
+        pos = _spread_nodes(pos, root_formula, min_dist=5.5)
 
     # Extract metrics from graph node attributes for coloring
     composites = {n: G.nodes[n].get('composite', None) for n in G.nodes()}
@@ -528,39 +586,39 @@ def main():
         q_per_ns[n] = float(qn) if qn is not None else np.nan
 
     # All panels use the same white→blue sequential colormap.
-    cmap_comp = matplotlib.colormaps['Blues']
-    # Build composite_for_color: for ranked nodes use the committed table value (immune to
-    # doscar drift); for non-ranked nodes use ehull_reward(e_hull) only (r_dos contribution
-    # is zero) so that compounds whose r_dos drifted upward after the table was frozen don't
-    # masquerade as high-quality nodes in the colormap.
-    # All values are then divided by the rank-1 table composite so the colorbar spans [0, 1]
-    # with rank 1 anchored at 1.0; non-ranked stable nodes sit at ≤0.60, clearly below any
-    # ranked node (rank 15 ≈ 0.78).
-    ranked_keys_now = set(mcts_ranks_from_table.keys())
-    composite_for_color = {}
-    for _n in G.nodes():
-        _key = _formula_key(_n)
-        if _key in ranked_keys_now and _key in table_composites:
-            composite_for_color[_n] = table_composites[_key]
-        else:
-            _eh = G.nodes[_n].get('e_hull', None)
-            composite_for_color[_n] = ehull_reward(_eh) if _eh is not None else np.nan
-
-    norm_comp = mcolors.Normalize(vmin=0.0, vmax=2.0)
-
-    # r_EHull: diverging colormap centred at 0, fixed range [-1, 1].
     # Truncate RdBu to [0.1, 0.9] so the endpoints are bright red/blue rather than near-black.
     _rdbu_base = matplotlib.colormaps['RdBu']
-    cmap_ehull = mcolors.LinearSegmentedColormap.from_list(
+    _rdbu_bright = mcolors.LinearSegmentedColormap.from_list(
         'RdBu_bright', _rdbu_base(np.linspace(0.1, 0.9, 256))
     )
+    # Panel (a): diverging red-to-blue colormap centred at 0 for product reward.
+    cmap_comp = _rdbu_bright
+
+    # Color all nodes by product reward (r_Ehull × r_DOS, gamma=1); diverging norm centred at 0.
+    composite_for_color = {}
+    for _n in G.nodes():
+        _eh = G.nodes[_n].get('e_hull', None)
+        _rdos = float(G.nodes[_n].get('r_dos', 0.0) or 0.0)
+        if _eh is not None:
+            composite_for_color[_n] = ehull_reward(_eh) * _rdos
+        else:
+            composite_for_color[_n] = np.nan
+
+    _comp_vals = [v for v in composite_for_color.values() if not pd.isna(v)]
+    if _comp_vals:
+        norm_comp = mcolors.Normalize(vmin=-2250, vmax=2250)
+    else:
+        norm_comp = None
+
+    # r_EHull: same bright RdBu, fixed range [-1, 1].
+    cmap_ehull = _rdbu_bright
     arr_eh = [v for v in ehull_rewards.values() if v is not None and not pd.isna(v)]
     norm_ehull = mcolors.TwoSlopeNorm(vmin=-1.0, vcenter=0.0, vmax=1.0) if arr_eh else None
 
     cmap_rdos = matplotlib.colormaps['Blues']
-    # Color by gamma * r_DOS (the actual composite-score component), fixed range [0, 1].
-    arr_r = [v * DEFAULT_GAMMA for v in r_doss.values() if v is not None and not pd.isna(v)]
-    norm_rdos = mcolors.Normalize(vmin=0.0, vmax=1.0) if arr_r else None
+    # Always use raw r_DOS (no gamma scaling); auto-scale to data range.
+    arr_r = [v for v in r_doss.values() if v is not None and not pd.isna(v) and v > 0]
+    norm_rdos = mcolors.Normalize(vmin=0.0, vmax=max(arr_r)) if arr_r else None
 
     cmap_qpern = matplotlib.colormaps['Blues']
     arr_qn = [v for v in q_per_ns.values() if not pd.isna(v)]
@@ -594,8 +652,8 @@ def main():
         else 'lightgray'
         for nid in G.nodes()
     ]
-    # Color by gamma * r_dos, explicitly labeled below
-    node_colors_rdos = node_colors_for_from_graph('r_dos', cmap_rdos, norm_rdos, scale=DEFAULT_GAMMA)
+    # Raw r_DOS (scale=1.0) — no gamma normalisation.
+    node_colors_rdos = node_colors_for_from_graph('r_dos', cmap_rdos, norm_rdos, scale=1.0)
 
     # Set global font size to 10pt for consistent publication text
     plt.rcParams.update({'font.size': 10})
@@ -617,59 +675,60 @@ def main():
     tree_edges = [e for e in G.edges() if e in bfs_tree_edges]
     cross_edges = [e for e in G.edges() if e not in bfs_tree_edges]
 
-    # 2x2 grid: Composite plain (a), Composite ranked (b), r_EHull (c), r_DOS (d).
-    # Q/N panel has been dropped.
-    fig, axes_grid = plt.subplots(2, 2, figsize=(5, 5), constrained_layout=True)
-    axes = [axes_grid[0, 0], axes_grid[0, 1], axes_grid[1, 0], axes_grid[1, 1]]
+    # Layout: large combined panel (a) on the left (2/3 width, full height),
+    # r_EHull (b) and r_DOS (c) stacked vertically on the right (1/3 width each).
+    fig = plt.figure(figsize=(6.5, 4))
+    gs = fig.add_gridspec(2, 2, width_ratios=[1.5, 1], wspace=0.0)
+    ax_main  = fig.add_subplot(gs[:, 0])   # combined composite + rank labels
+    ax_ehull = fig.add_subplot(gs[0, 1])   # r_EHull
+    ax_rdos  = fig.add_subplot(gs[1, 1])   # r_DOS
 
-    panels = [
-        (axes[0], node_colors_comp, cmap_comp, norm_comp, 'Composite Score'),
-        (axes[1], node_colors_comp, cmap_comp, norm_comp, 'Composite Score'),
-        (axes[2], node_colors_ehull, cmap_ehull, norm_ehull, r"$r_{E_{\mathrm{Hull}}}$"),
-        (axes[3], node_colors_rdos, cmap_rdos, norm_rdos,
-         r"$r_{\mathrm{DOS}}$"),
-    ]
+    rdos_label = r"$r_{\mathrm{DOS}}$"
+    comp_label = 'Product Reward'
 
-    # Keys of top-15 nodes, used to fade background nodes in panel (a).
     ranked_keys = set(mcts_ranks_from_table.keys())
 
-    labels_abc = ['(a)', '(b)', '(c)', '(d)']
-    for i, (ax, ncols, cmap_m, norm_m, label) in enumerate(panels):
-        # Draw edges first so smaller nodes sit cleanly on top of arrow tips.
-        # Secondary (d5-run) edges: dashed, drawn first so main edges sit on top.
-        sec_edgelist = [e for e in secondary_edges if e[0] in pos and e[1] in pos]
-        if sec_edgelist:
-            nx.draw_networkx_edges(G, pos, ax=ax, edgelist=sec_edgelist,
-                                   edge_color='#AAAAAA', width=0.5, arrows=True,
-                                   arrowsize=4, arrowstyle='-|>',
-                                   connectionstyle='arc3,rad=0.15',
-                                   style='dashed',
-                                   node_size=NODE_SIZE, min_source_margin=2, min_target_margin=2)
-        # Spanning-tree edges: the actual branch structure, drawn bold with arrows.
+    panels = [
+        (ax_main,  node_colors_comp,  cmap_comp,  norm_comp,  comp_label,                    '(a)'),
+        (ax_ehull, node_colors_ehull, cmap_ehull, norm_ehull, r"$r_{E_{\mathrm{Hull}}}$",    '(b)'),
+        (ax_rdos,  node_colors_rdos,  cmap_rdos,  norm_rdos,  rdos_label,                    '(c)'),
+    ]
+
+    # Larger nodes for the spacious main panel; smaller for the compact right panels.
+    NODE_SIZE_MAIN  = 120
+    NODE_SIZE_SMALL = 24
+
+    for ax, ncols, cmap_m, norm_m, label, abc in panels:
+        is_main = ax is ax_main
+        ns = NODE_SIZE_MAIN if is_main else NODE_SIZE_SMALL
+
+        # Dashed secondary edges omitted from the main panel for clarity.
+        if not is_main:
+            sec_edgelist = [e for e in secondary_edges if e[0] in pos and e[1] in pos]
+            if sec_edgelist:
+                nx.draw_networkx_edges(G, pos, ax=ax, edgelist=sec_edgelist,
+                                       edge_color='#AAAAAA', width=0.5, arrows=True,
+                                       arrowsize=4, arrowstyle='-|>',
+                                       connectionstyle='arc3,rad=0.15',
+                                       style='dashed',
+                                       node_size=ns, min_source_margin=2, min_target_margin=2)
+
+        arrow_sz = 7 if is_main else 4
+        edge_w = 1.2 if is_main else 0.7
         nx.draw_networkx_edges(G, pos, ax=ax, edgelist=tree_edges,
-                               edge_color='dimgray', width=0.7, arrows=True, arrowsize=5,
-                               arrowstyle='-|>', connectionstyle='arc3,rad=0.08',
-                               node_size=NODE_SIZE, min_source_margin=2, min_target_margin=2)
+                               edge_color='dimgray', width=edge_w, arrows=True,
+                               arrowsize=arrow_sz, arrowstyle='-|>',
+                               connectionstyle='arc3,rad=0.08',
+                               node_size=ns, min_source_margin=2, min_target_margin=2)
 
+        # All nodes at full opacity.
         node_list = list(G.nodes())
-        if i == 1:
-            # Panel (b) — Composite Score highlighted: fade non-ranked nodes,
-            # bold synth borders, and overlay MCTS rank numbers on top-15 nodes.
-            ranked = [n for n in node_list if _formula_key(n) in ranked_keys]
-            non_ranked = [n for n in node_list if _formula_key(n) not in ranked_keys]
-            ranked_synth = [n for n in ranked if _formula_key(n) in synth_keys]
-            ranked_non_synth = [n for n in ranked if _formula_key(n) not in synth_keys]
+        nx.draw_networkx_nodes(G, pos, ax=ax, nodelist=node_list,
+                               node_color=ncols, edgecolors='black',
+                               linewidths=0.5, node_size=ns)
 
-            if non_ranked:
-                nx.draw_networkx_nodes(G, pos, ax=ax, nodelist=non_ranked,
-                                       node_color='#DDDDDD', edgecolors='#AAAAAA',
-                                       linewidths=0.3, node_size=NODE_SIZE)
-            if ranked:
-                r_cols = [ncols[node_list.index(n)] for n in ranked]
-                nx.draw_networkx_nodes(G, pos, ax=ax, nodelist=ranked,
-                                       node_color=r_cols, edgecolors='black',
-                                       linewidths=0.5, node_size=NODE_SIZE)
-            # Rank labels on ranked nodes only.
+        # Rank labels on the main panel only; scale font with node size.
+        if is_main:
             for node in G.nodes():
                 key = _formula_key(node)
                 rank = mcts_ranks_from_table.get(key)
@@ -678,44 +737,65 @@ def main():
                 x, y = pos.get(node, (None, None))
                 if x is None:
                     continue
-                is_synth = key in synth_keys
-                ax.text(x, y, str(rank), ha='center', va='center', fontsize=5,
-                        fontweight='bold' if is_synth else 'normal',
-                        color='white', zorder=10)
-        else:
-            # Panels (a), (c), (d): all nodes at full opacity, uniform thin border.
-            nx.draw_networkx_nodes(G, pos, ax=ax, nodelist=node_list,
-                                   node_color=ncols, edgecolors='black',
-                                   linewidths=0.5, node_size=NODE_SIZE)
+                ax.text(x, y, str(rank), ha='center', va='center', fontsize=8,
+                        fontweight='normal', color='white', zorder=10)
 
-        # Highlight the MCTS root as the starting node without changing its color encoding
+        # Gold star on MCTS root.
         if root_formula is not None and root_formula in pos:
             rx, ry = pos[root_formula]
-            ax.scatter([rx], [ry], s=NODE_SIZE * 0.55, marker='*', facecolor='gold',
+            ax.scatter([rx], [ry], s=ns * 0.55, marker='*', facecolor='gold',
                        edgecolors='black', linewidths=0.5, zorder=5)
-        # add panel letter in top-left
-        try:
-            abc = labels_abc[i]
-        except Exception:
-            abc = ''
-        ax.text(0.02, 0.98, abc, transform=ax.transAxes, va='top', ha='left', fontsize=10, weight='bold')
-        ax.axis('equal')
-        # colorbar for each panel; place metric label below the colorbar
+
+        ax.text(0.02, 0.98, abc, transform=ax.transAxes, va='top', ha='left',
+                fontsize=10, weight='bold')
+        # Set equal, centered limits so the graph fills the axes box and all
+        # panels align at their edges rather than shrinking to maintain aspect.
+        if pos:
+            _xs = [pos[n][0] for n in G.nodes() if n in pos]
+            _ys = [pos[n][1] for n in G.nodes() if n in pos]
+            _cx = (max(_xs) + min(_xs)) / 2
+            _cy = (max(_ys) + min(_ys)) / 2
+            _x_ext = max(_xs) - min(_xs)
+            _y_ext = max(_ys) - min(_ys)
+            if is_main:
+                _half = max(_x_ext, _y_ext) / 2 * 1.15
+                ax.set_xlim(_cx - _half, _cx + _half)
+                ax.set_ylim(_cy - _half, _cy + _half)
+            else:
+                # x: pad based on full extent; y: pad based on actual y extent
+                # so the tree stretches vertically to fill the panel.
+                _half_x = max(_x_ext, _y_ext) / 2 * 1.55
+                _half_y = _y_ext / 2 * 1.12
+                ax.set_xlim(_cx - _half_x, _cx + _half_x)
+                ax.set_ylim(_cy - _half_y, _cy + _half_y)
+        ax.set_axis_off()
+
+        # Colorbar inset inside each panel (bottom-centre of the axes).
         sm = cm.ScalarMappable(norm=norm_m, cmap=cmap_m)
         sm.set_array([])
-        cbar = plt.colorbar(sm, ax=ax, orientation='horizontal', fraction=0.08, pad=0.08, aspect=20)
-        cbar.ax.tick_params(labelsize=10)
-        cbar.set_label(label, fontsize=10)
-        try:
+        if is_main:
+            cax = ax.inset_axes([0.20, 0.01, 0.55, 0.022])
+            cbar = plt.colorbar(sm, cax=cax, orientation='horizontal')
+            cbar.ax.tick_params(labelsize=7)
+            cbar.set_label(label, fontsize=8)
             cbar.ax.xaxis.set_label_position('bottom')
             cbar.ax.xaxis.tick_bottom()
-        except Exception:
-            pass
+        else:
+            cax = ax.inset_axes([0.92, 0.10, 0.05, 0.75])  # vertical, right side
+            cbar = plt.colorbar(sm, cax=cax, orientation='vertical')
+            cbar.ax.tick_params(labelsize=7)
+            cbar.set_label(label, fontsize=8, labelpad=4)
+            cbar.ax.yaxis.set_label_position('right')
 
     # Ensure figures directory exists and save into it
-    figures_dir = script_dir / 'figures'
+    if product_mode:
+        figures_dir = script_dir / 'product_mode' / 'figures'
+        output_filename = 'radial_tree_composite_product.png'
+    else:
+        figures_dir = script_dir / 'figures'
+        output_filename = 'radial_tree_composite.png'
     figures_dir.mkdir(parents=True, exist_ok=True)
-    output_path = figures_dir / 'radial_tree_composite.png'
+    output_path = figures_dir / output_filename
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"Saved: {output_path}")
