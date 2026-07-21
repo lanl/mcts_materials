@@ -110,6 +110,29 @@ def test_intermetallic_ehull_rdos_requires_both():
     assert cfg.gamma == 0.0001
 
 
+def test_intermetallic_ehull_rdos_product_requires_both():
+    # ehull_rdos_product needs BOTH mp_api_key and doscar_data_path.
+    with pytest.raises(ValidationError):
+        IntermetallicConfig(
+            structure_path="foo.cif",
+            rollout_method="ehull_rdos_product",
+            mp_api_key="KEY",  # missing doscar
+        )
+    with pytest.raises(ValidationError):
+        IntermetallicConfig(
+            structure_path="foo.cif",
+            rollout_method="ehull_rdos_product",
+            doscar_data_path="doscar.csv",  # missing key
+        )
+    cfg = IntermetallicConfig(
+        structure_path="foo.cif",
+        rollout_method="ehull_rdos_product",
+        mp_api_key="KEY",
+        doscar_data_path="doscar.csv",
+    )
+    assert cfg.rollout_method == "ehull_rdos_product"
+
+
 def test_f_block_mode_canonical_values():
     for mode in [
         "u_only",

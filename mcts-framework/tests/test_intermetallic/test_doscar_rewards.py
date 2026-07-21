@@ -17,6 +17,7 @@ from mcts_framework.intermetallic.rewards import (
     EhullReward,
     RdosReward,
     EhullRdosReward,
+    EhullRdosProductReward,
     create_intermetallic_reward,
 )
 
@@ -167,6 +168,41 @@ def test_ehull_rdos_default_weights():
     assert r.gamma == 0.0001
 
 
+# --- EhullRdosProductReward (multiplicative) -----------------------------
+
+
+def test_ehull_rdos_product_formula():
+    lookup = DoscarRewardLookup(peaks_file=None)
+    r = EhullRdosProductReward(lookup)
+    # e_hull=0 -> ehull_term ~ +1; product = ehull_term * rdos (no gamma)
+    props = {"e_above_hull": 0.0, "rdos": 100.0}
+    expected = ehull_reward(0.0) * 100.0
+    assert abs(r.compute_reward(props) - expected) < 1e-9
+
+
+def test_ehull_rdos_product_negative_when_unstable():
+    """Key property: an unstable compound (ehull_term < 0) yields a negative
+    product regardless of how favorable the rDOS is."""
+    lookup = DoscarRewardLookup(peaks_file=None)
+    r = EhullRdosProductReward(lookup)
+    # e_hull=0.2 (well above 0.05 threshold) -> ehull_term ~ -1
+    props = {"e_above_hull": 0.2, "rdos": 5000.0}  # large positive rDOS
+    reward = r.compute_reward(props)
+    assert reward < 0.0  # negative despite strong rDOS
+
+
+def test_ehull_rdos_product_ranking_gamma_free():
+    """The product reward takes no gamma; ranking depends only on
+    ehull_term * rdos."""
+    lookup = DoscarRewardLookup(peaks_file=None)
+    r = EhullRdosProductReward(lookup)
+    # Stable + higher rDOS should outrank stable + lower rDOS.
+    hi = r.compute_reward({"e_above_hull": 0.0, "rdos": 200.0})
+    lo = r.compute_reward({"e_above_hull": 0.0, "rdos": 100.0})
+    assert hi > lo
+    assert not hasattr(r, "gamma")
+
+
 # --- Factory -------------------------------------------------------------
 
 
@@ -188,6 +224,20 @@ def test_create_reward_ehull_rdos():
     assert isinstance(r, EhullRdosReward)
     assert r.beta == 2.0
     assert r.gamma == 0.01
+
+
+def test_create_reward_ehull_rdos_product():
+    lookup = DoscarRewardLookup(peaks_file=None)
+    # gamma is accepted by the factory signature but ignored by the product
+    # method (it takes no gamma).
+    r = create_intermetallic_reward("ehull_rdos_product", lookup, gamma=0.02)
+    assert isinstance(r, EhullRdosProductReward)
+    assert not hasattr(r, "gamma")
+
+
+def test_create_reward_ehull_rdos_product_requires_lookup():
+    with pytest.raises(ValueError):
+        create_intermetallic_reward("ehull_rdos_product")
 
 
 def test_create_reward_unknown():

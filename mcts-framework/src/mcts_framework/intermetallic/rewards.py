@@ -1,15 +1,20 @@
 """
 Reward functions for intermetallic search.
 
-Three formulations, matching the validated mcts_crystal rollout methods:
+Four formulations, matching the validated mcts_crystal rollout methods:
 
-    EhullReward       : -tanh(120 * (e_hull - 0.05))          ('ehull')
-    EhullRdosReward   : beta * ehull_term + gamma * r_DOS      ('ehull_rdos')
-    RdosReward        : r_DOS                                  ('rdos')
+    EhullReward            : -tanh(120 * (e_hull - 0.05))          ('ehull')
+    EhullRdosReward        : beta * ehull_term + gamma * r_DOS      ('ehull_rdos')
+    EhullRdosProductReward : ehull_term * r_DOS                    ('ehull_rdos_product')
+    RdosReward             : r_DOS                                  ('rdos')
 
 The ehull sharpness (120) and stability threshold (0.05 eV/atom) are
 physics-informed constants, not tunable hyperparameters. beta and gamma are
-the composite-score weights (defaults 1.0 / 0.0001 from the published study).
+the additive composite-score weights (defaults 1.0 / 0.0001 from the published
+study). The product method takes NO gamma - a single global scalar cannot
+change a purely multiplicative ranking - and because ehull_term is negative
+for unstable compounds, an unstable compound yields a negative product
+regardless of DOS quality.
 
 Properties consumed:
     e_above_hull : from the MACE/Materials Project evaluator.
@@ -17,7 +22,7 @@ Properties consumed:
     rdos         : optional precomputed r_DOS; if absent, looked up from the
                    DoscarRewardLookup using 'formula'.
 
-© 2025. Triad National Security, LLC. All rights reserved.
+© 2026. Triad National Security, LLC. All rights reserved.
 """
 
 from typing import Dict, List, Optional
@@ -109,6 +114,36 @@ class EhullRdosReward(RewardFunction):
         return ["e_above_hull", "formula"]
 
 
+class EhullRdosProductReward(RewardFunction):
+    """
+    Multiplicative composite reward ('ehull_rdos_product'):
+
+        reward = ehull_reward(e_hull) * r_DOS
+
+    Unlike mcts_crystal's product method, this drops the gamma factor: in a
+    purely multiplicative reward a single global scalar multiplies every
+    compound's score equally, so it cannot change the ranking (argmax is
+    gamma-invariant for gamma > 0) - it only rescales magnitudes. Removing it
+    keeps the reward meaningful without a redundant knob.
+
+    Since ehull_reward is negative for unstable compounds (e_hull above the
+    0.05 eV/atom threshold), an unstable compound yields a negative product
+    regardless of how favorable its rDOS is - so this method gates on
+    stability more strictly than the additive ehull_rdos.
+    """
+
+    def __init__(self, doscar_lookup: DoscarRewardLookup):
+        self.doscar_lookup = doscar_lookup
+
+    def compute_reward(self, properties: Dict[str, float]) -> float:
+        ehull_term = ehull_reward(properties["e_above_hull"])
+        rdos = _resolve_rdos(properties, self.doscar_lookup)
+        return ehull_term * rdos
+
+    def get_property_names(self) -> List[str]:
+        return ["e_above_hull", "formula"]
+
+
 def create_intermetallic_reward(
     rollout_method: str,
     doscar_lookup: Optional[DoscarRewardLookup] = None,
@@ -119,9 +154,11 @@ def create_intermetallic_reward(
     Factory: build the reward function for a given rollout method.
 
     Args:
-        rollout_method: One of 'ehull', 'ehull_rdos', 'rdos'.
-        doscar_lookup: Required for 'rdos' and 'ehull_rdos'.
-        beta, gamma: Composite weights for 'ehull_rdos'.
+        rollout_method: One of 'ehull', 'ehull_rdos', 'ehull_rdos_product',
+            'rdos'.
+        doscar_lookup: Required for 'rdos', 'ehull_rdos', 'ehull_rdos_product'.
+        beta: E_hull weight for 'ehull_rdos' (unused by other methods).
+        gamma: rDOS weight for 'ehull_rdos' (unused by other methods).
 
     Raises:
         ValueError: On unknown method or missing doscar_lookup.
@@ -136,4 +173,10 @@ def create_intermetallic_reward(
         if doscar_lookup is None:
             raise ValueError("rollout_method='ehull_rdos' requires a doscar_lookup")
         return EhullRdosReward(doscar_lookup, beta=beta, gamma=gamma)
+    if rollout_method == "ehull_rdos_product":
+        if doscar_lookup is None:
+            raise ValueError(
+                "rollout_method='ehull_rdos_product' requires a doscar_lookup"
+            )
+        return EhullRdosProductReward(doscar_lookup)
     raise ValueError(f"Unknown rollout_method: {rollout_method!r}")

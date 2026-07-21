@@ -14,6 +14,7 @@ from .rewards import (
     EhullReward,
     RdosReward,
     EhullRdosReward,
+    EhullRdosProductReward,
     ehull_reward,
     create_intermetallic_reward,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "EhullReward",
     "RdosReward",
     "EhullRdosReward",
+    "EhullRdosProductReward",
     "ehull_reward",
     "create_intermetallic_reward",
     "MaceEvaluator",

@@ -31,6 +31,7 @@ MCTS core:
 | `DoscarRewardLookup` | `mcts_framework.intermetallic.DoscarRewardLookup` (unchanged behavior, one bug fixed*) |
 | `rollout_method="ehull"` (string) | `EhullReward()` object |
 | `rollout_method="ehull_rdos"` | `EhullRdosReward(doscar, beta, gamma)` |
+| `rollout_method="ehull_rdos_product"` | `EhullRdosProductReward(doscar)` — see note below |
 | `rollout_method="rdos"` | `RdosReward(doscar)` |
 | `node.e_form`, `node.e_above_hull` | `node.properties["e_form"]`, `node.properties["e_above_hull"]` |
 | `f_block_mode="experimental"` | `f_block_mode="lanthanides_u_no_wrap"` (old name still accepted as an alias) |
@@ -40,6 +41,15 @@ MCTS core:
 
 \* The DOSCAR valence-suffix lookup bug is fixed in the new code; results for
 the published U-only study are unaffected (all its compounds had core entries).
+
+**`ehull_rdos_product` — deliberate gamma divergence.** mcts_crystal's product
+method computes `ehull_reward(e_hull) * (gamma * r_DOS)`. The framework drops
+the gamma: in a purely multiplicative reward a single global scalar multiplies
+every compound's score equally, so it cannot change the ranking (argmax is
+gamma-invariant for gamma > 0) — it only rescales magnitudes. The framework's
+`EhullRdosProductReward` therefore computes `ehull_reward(e_hull) * r_DOS` and
+takes no gamma. (Unstable compounds still yield a negative product, since
+`ehull_reward` is negative above the 0.05 eV/atom threshold.)
 
 ## Programmatic API: before / after
 

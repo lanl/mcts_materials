@@ -19,7 +19,7 @@ regardless.
 
 ## Current status
 
-Test suite: **149 passed, 2 skipped** (`pytest` from the `mcts-framework/` dir).
+Test suite: **155 passed, 2 skipped** (`pytest` from the `mcts-framework/` dir).
 The 2 skips are RDKit-dependent molecule tests (RDKit not installed in the
 current env — see caveats).
 
@@ -42,6 +42,21 @@ framework was updated to match the *current* mcts_crystal search behavior:
   rollout_aggregation='max', max-along-walk). `node.own_reward` remains the
   undiscounted depth-0 value regardless of aggregation (preserves the
   global-best-consistency fix).
+
+### Second upstream catch-up: ehull_rdos_product reward
+
+`origin/main` had NOT moved (still 168b220); the new work lived on
+`origin/develop` (#29 "multiple reward"), whose sole functional addition was a
+multiplicative reward method. Per user decision, we did NOT rebase (main
+unchanged) and only ported the reward:
+
+- **`EhullRdosProductReward`** (`intermetallic/rewards.py`) — new rollout
+  method `ehull_rdos_product`. Plumbed through the config `rollout_method`
+  Literal (+ needs mp_api_key + doscar_data_path), builders, and factory.
+- **Deliberate divergence from mcts_crystal**: upstream computes
+  `ehull_reward(e_hull) * (gamma * r_DOS)`; the framework drops gamma
+  (`ehull_reward(e_hull) * r_DOS`) because a global scalar cannot change a
+  purely multiplicative ranking. See MIGRATION.md for the rationale.
 
 ### Done
 - **Core** (`src/mcts_framework/core/`): Material, MoveGenerator,

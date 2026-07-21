@@ -81,9 +81,9 @@ def _build_intermetallic(config: Config) -> Tuple[object, object, "PropertyEvalu
     moves = PeriodicTableMoves(f_block_mode=ic.f_block_mode, move_step=ic.move_step)
     evaluator = MaceEvaluator(cache_path=ic.cache_path, mp_api_key=ic.mp_api_key)
 
-    # DOSCAR lookup only needed for rdos / ehull_rdos.
+    # DOSCAR lookup needed for the rDOS-using methods.
     doscar = None
-    if ic.rollout_method in ("rdos", "ehull_rdos"):
+    if ic.rollout_method in ("rdos", "ehull_rdos", "ehull_rdos_product"):
         doscar = DoscarRewardLookup(peaks_file=ic.doscar_data_path)
 
     reward = create_intermetallic_reward(

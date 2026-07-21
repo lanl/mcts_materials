@@ -117,9 +117,13 @@ class IntermetallicConfig(BaseModel):
         "3 = extended-range exploration)",
     )
 
-    rollout_method: Literal["ehull", "ehull_rdos", "rdos"] = "ehull"
+    rollout_method: Literal[
+        "ehull", "ehull_rdos", "ehull_rdos_product", "rdos"
+    ] = "ehull"
     beta: float = Field(1.0, description="E_hull weight (ehull_rdos)")
-    gamma: float = Field(0.0001, description="rDOS weight (ehull_rdos)")
+    gamma: float = Field(
+        0.0001, description="rDOS weight (ehull_rdos / ehull_rdos_product)"
+    )
 
     mp_api_key: Optional[str] = Field(None, description="Materials Project API key")
     doscar_data_path: Optional[str] = Field(
@@ -145,12 +149,16 @@ class IntermetallicConfig(BaseModel):
 
     @model_validator(mode="after")
     def _check_reward_requirements(self) -> "IntermetallicConfig":
-        needs_key = self.rollout_method in ("ehull", "ehull_rdos")
+        needs_key = self.rollout_method in (
+            "ehull", "ehull_rdos", "ehull_rdos_product"
+        )
         if needs_key and not self.mp_api_key:
             raise ValueError(
                 f"rollout_method={self.rollout_method!r} requires mp_api_key"
             )
-        needs_doscar = self.rollout_method in ("rdos", "ehull_rdos")
+        needs_doscar = self.rollout_method in (
+            "rdos", "ehull_rdos", "ehull_rdos_product"
+        )
         if needs_doscar and not self.doscar_data_path:
             raise ValueError(
                 f"rollout_method={self.rollout_method!r} requires doscar_data_path"

@@ -31,6 +31,8 @@ intermetallic:
   move_step: 1                  # max jump per substitution along TM/Group-IV/
                                 # lanthanide axes (1 = adjacent; 3 = extended)
   rollout_method: rdos          # rdos (no API key) | ehull | ehull_rdos
+                                # | ehull_rdos_product (multiplicative:
+                                #   ehull_reward * r_DOS, needs key+DOSCAR)
   beta: 1.0                     # E_hull weight (ehull_rdos only)
   gamma: 0.0001                 # rDOS weight  (ehull_rdos only)
 
