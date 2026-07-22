@@ -263,6 +263,65 @@ async def test_mean_aggregation_differs_from_max():
     assert mcts_mean.root.own_reward == mcts_max.root.own_reward == -5.0
 
 
+# --- search_mode (fast vs thorough) --------------------------------------
+
+
+def test_invalid_search_mode_rejected():
+    import pytest as _pytest
+    with _pytest.raises(ValueError):
+        make_mcts(search_mode="turbo")
+
+
+@pytest.mark.asyncio
+async def test_fast_mode_stops_when_root_converges():
+    """In 'fast' mode the run stops once the root self-terminates (its
+    no-improvement countdown fires), before the full iteration budget."""
+    mcts = make_mcts(target=5, start=0, n_rollout=1, rollout_depth=0,
+                     termination_limit=10, search_mode="fast")
+    await mcts.run(iterations=2000)
+    assert mcts.root.terminated
+    assert mcts.iteration + 1 < 2000  # stopped early
+
+
+@pytest.mark.asyncio
+async def test_thorough_mode_ignores_root_convergence():
+    """In 'thorough' mode root self-termination does NOT stop the run; it uses
+    the full budget (unless the space is genuinely exhausted). With the same
+    settings that make 'fast' stop early, 'thorough' runs longer and visits
+    at least as many compounds."""
+    common = dict(target=5, start=0, n_rollout=1, rollout_depth=0,
+                  termination_limit=10)
+    fast = make_mcts(search_mode="fast", **common)
+    await fast.run(iterations=500)
+    thorough = make_mcts(search_mode="thorough", **common)
+    await thorough.run(iterations=500)
+
+    assert thorough.iteration + 1 > fast.iteration + 1
+    assert len(thorough.visited_materials) >= len(fast.visited_materials)
+
+
+@pytest.mark.asyncio
+async def test_thorough_mode_still_stops_on_true_exhaustion():
+    """A tiny bounded space is fully reachable; 'thorough' must still stop once
+    every branch is exhausted rather than spin forever."""
+    # Line clamped to [0, 3]: only 4 compounds exist.
+    mcts = MCTS(
+        root_material=IntMaterial(0),
+        move_generator=LineMoves(lo=0, hi=3),
+        property_evaluator=DistanceEvaluator(target=2),
+        reward_function=NegDistanceReward(),
+        selection_strategy=UCB1(),
+        termination_limit=5,
+        n_rollout=1, rollout_depth=0,
+        search_mode="thorough", seed=0,
+    )
+    await mcts.run(iterations=100000)
+    # Stopped on exhaustion well before the huge budget, having found all 4.
+    assert mcts.terminated
+    assert mcts.iteration + 1 < 100000
+    assert len(mcts.visited_materials) == 4
+
+
 # --- Results helpers -----------------------------------------------------
 
 

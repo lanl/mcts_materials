@@ -136,6 +136,32 @@ def test_update_improves_subtree_best():
     assert node.visits_since_improvement == 1
 
 
+def test_tie_counts_as_improvement():
+    """A visit tying the subtree best resets the no-improvement countdown
+    (non-strict >= comparison)."""
+    node = SearchNode(SimpleMaterial("A"))
+
+    node.update(1.0)
+    assert node.visits_since_improvement == 0
+
+    node.update(0.5)  # below best -> counts as no improvement
+    assert node.visits_since_improvement == 1
+
+    node.update(1.0)  # ties best -> resets countdown
+    assert node.subtree_best == 1.0
+    assert node.visits_since_improvement == 0
+
+
+def test_ties_prevent_termination():
+    """Repeatedly tying the best keeps a node alive past termination_limit;
+    strictly-below rewards would have terminated it."""
+    node = SearchNode(SimpleMaterial("A"), termination_limit=3)
+    node.update(1.0)
+    for _ in range(10):
+        node.update(1.0)  # every visit ties -> countdown never fires
+    assert not node.terminated
+
+
 def test_termination_after_limit():
     """Test node terminates after limit visits without improvement."""
     material = SimpleMaterial("A")

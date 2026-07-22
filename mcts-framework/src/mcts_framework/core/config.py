@@ -80,6 +80,13 @@ class MCTSConfig(BaseModel):
         "extra samples discounted by 0.9**rollout_depth) or 'mean' (unbiased "
         "average of undiscounted samples)",
     )
+    search_mode: Literal["fast", "thorough"] = Field(
+        "fast",
+        description="When to stop: 'fast' (stop once the root converges - "
+        "fewest evaluations, finds the optimum quickly) or 'thorough' (run the "
+        "full iteration budget unless the reachable space is exhausted - "
+        "explores more compounds for a better top-N list)",
+    )
 
     seed: Optional[int] = Field(None, description="Random seed for reproducibility")
     output_dir: str = Field("mcts_results", description="Output directory")

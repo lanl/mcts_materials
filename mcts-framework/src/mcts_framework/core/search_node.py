@@ -162,9 +162,14 @@ class SearchNode(Generic[M]):
         Updates:
         - Increments visit count
         - Adds reward to total
-        - Updates subtree_best if improved
+        - Updates subtree_best if reward >= subtree_best (non-strict)
         - Tracks visits_since_improvement
         - Checks termination condition
+
+        The improvement test is non-strict (reward >= subtree_best) so that a
+        visit tying the current subtree best resets the no-improvement
+        countdown. The comparison is per-node (this node's own subtree_best),
+        not a global maximum.
 
         Args:
             reward: Reward value to incorporate
@@ -172,7 +177,7 @@ class SearchNode(Generic[M]):
         self.total_reward += reward
         self.visits += 1
 
-        if reward > self.subtree_best:
+        if reward >= self.subtree_best:
             self.subtree_best = reward
             self.visits_since_improvement = 0
         else:

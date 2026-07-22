@@ -19,7 +19,7 @@ regardless.
 
 ## Current status
 
-Test suite: **155 passed, 2 skipped** (`pytest` from the `mcts-framework/` dir).
+Test suite: **162 passed, 2 skipped** (`pytest` from the `mcts-framework/` dir).
 The 2 skips are RDKit-dependent molecule tests (RDKit not installed in the
 current env — see caveats).
 
@@ -57,6 +57,28 @@ unchanged) and only ported the reward:
   `ehull_reward(e_hull) * (gamma * r_DOS)`; the framework drops gamma
   (`ehull_reward(e_hull) * r_DOS`) because a global scalar cannot change a
   purely multiplicative ranking. See MIGRATION.md for the rationale.
+
+### search_mode knob (fast vs thorough)
+
+Equivalence testing against develop surfaced that the framework consistently
+explored fewer compounds than mcts_crystal (e.g. 41 vs 68 for ehull). Root
+cause: the framework halts the whole run when the ROOT node self-terminates
+(its visits-without-improvement countdown), while mcts_crystal only halts on
+true exhaustion. On the near-continuous rollout reward the root's countdown
+fires early, leaving much of the reachable space unexplored. (Sweeps confirmed
+`termination_limit` barely moves coverage; `exploration_constant` helps but is
+capped by the root halt.)
+
+Added `search_mode` on `MCTS` + `MCTSConfig` (plumbed via builders):
+- **`fast`** (default): keep the early stop-on-root-convergence — fewest
+  evaluations (DFT/MACE), finds the optimum quickly.
+- **`thorough`**: ignore root self-termination, use the full iteration budget
+  (stop only on true exhaustion) — broader top-N candidate list. Reproduces
+  mcts_crystal-style breadth.
+
+Also changed the no-improvement test in `SearchNode.update` from strict `>` to
+non-strict `>=` (ties reset the countdown), per-node against `subtree_best`.
+See MIGRATION.md "Termination / search_mode" for the full comparison.
 
 ### Done
 - **Core** (`src/mcts_framework/core/`): Material, MoveGenerator,

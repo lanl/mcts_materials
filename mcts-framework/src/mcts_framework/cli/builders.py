@@ -59,6 +59,7 @@ def build_mcts(config: Config) -> MCTS:
         rollout_depth=config.mcts.rollout_depth,
         n_rollout=config.mcts.n_rollout,
         rollout_aggregation=config.mcts.rollout_aggregation,
+        search_mode=config.mcts.search_mode,
         seed=config.mcts.seed,
     )
 

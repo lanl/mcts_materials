@@ -174,6 +174,18 @@ The intermetallic rewards preserve the validated constants from `mcts_crystal`:
   the random walk and returns the max, extracting up to `rollout_depth`
   candidate evaluations per walk instead of only the endpoint.
 
+### `search_mode` — efficiency vs. breadth
+Controls when the run stops, trading evaluation cost (DFT/MACE calls) against
+top-N coverage:
+- **`fast`** (default): stop as soon as the root converges (its
+  no-improvement countdown fires). Fewest evaluations; finds the single
+  optimum quickly.
+- **`thorough`**: ignore root convergence and use the full `iterations`
+  budget (stopping early only on true exhaustion — every branch terminated).
+  Explores more compounds for a better ranked top-N candidate list, at the
+  cost of more evaluations. Pair with a larger `exploration_constant` for
+  wider coverage.
+
 ## Development
 
 ```bash

@@ -16,6 +16,7 @@ mcts:
   rollout_depth: 1
   n_rollout: 5
   rollout_aggregation: max      # max (optimistic, discounts extra samples) | mean
+  search_mode: fast             # fast (stop at convergence) | thorough (full budget)
   seed: 0
   output_dir: mcts_results_molecule
 

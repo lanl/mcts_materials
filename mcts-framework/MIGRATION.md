@@ -51,6 +51,35 @@ gamma-invariant for gamma > 0) — it only rescales magnitudes. The framework's
 takes no gamma. (Unstable compounds still yield a negative product, since
 `ehull_reward` is negative above the 0.05 eV/atom threshold.)
 
+**Termination / `search_mode` — a real behavioral difference.** The two
+codebases stop the search on different conditions:
+
+- **mcts_crystal** only halts globally on *true exhaustion* — when the
+  selection walk reaches a node whose children are all terminated. A node's own
+  visits-without-improvement countdown just marks it terminated so selection
+  *avoids* it; the search keeps exploring other branches until the iteration
+  budget runs out. Effectively it (almost) always uses the full budget and
+  explores broadly.
+- **the framework** additionally halts the whole run when the *root* node
+  self-terminates via its countdown. Because the root sits on every
+  backpropagation chain, its countdown fires once the (near-continuous) rollout
+  reward stops improving, ending the run early — often with much of the
+  reachable space unexplored.
+
+The framework exposes this as a knob, `search_mode` (`MCTS(search_mode=...)` /
+`mcts.search_mode` in config):
+
+- **`fast`** (default): keep the framework's early stop-on-root-convergence.
+  Fewest evaluations (DFT/MACE calls); finds the single optimum quickly.
+- **`thorough`**: ignore root self-termination, matching mcts_crystal's
+  exhaustion-only behavior, so the full iteration budget is used and more
+  compounds are explored for a better ranked top-N candidate list. Pair with a
+  larger `exploration_constant` for wider coverage.
+
+Both modes still find the true optimum; they differ in how many candidates are
+evaluated on the way. (`fast` has no mcts_crystal analogue; `thorough`
+reproduces mcts_crystal-style breadth.)
+
 ## Programmatic API: before / after
 
 **Old (`mcts_crystal`):**

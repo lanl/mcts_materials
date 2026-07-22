@@ -35,6 +35,13 @@ def test_mcts_config_rollout_aggregation():
         MCTSConfig(rollout_aggregation="median")
 
 
+def test_mcts_config_search_mode():
+    assert MCTSConfig().search_mode == "fast"  # default
+    assert MCTSConfig(search_mode="thorough").search_mode == "thorough"
+    with pytest.raises(ValidationError):
+        MCTSConfig(search_mode="turbo")
+
+
 def test_mcts_config_rejects_unknown_field():
     with pytest.raises(ValidationError):
         MCTSConfig(not_a_field=123)

@@ -65,6 +65,7 @@ class MCTS(Generic[M]):
         rollout_depth: int = 1,
         n_rollout: int = 5,
         rollout_aggregation: str = "max",
+        search_mode: str = "fast",
         seed: Optional[int] = None,
     ):
         """
@@ -91,6 +92,25 @@ class MCTS(Generic[M]):
                   estimate of expected reward. The depth discount is dropped
                   here (discounting-then-averaging-by-unweighted-n would just
                   drag the mean toward zero rather than weight confidence).
+            search_mode: When the run stops.
+                - 'fast' (default): stop as soon as the ROOT node self-
+                  terminates via its visits-without-improvement countdown
+                  (i.e. the search has converged). Minimizes evaluations
+                  (DFT/MACE calls); best when finding the single optimum
+                  quickly matters most.
+                - 'thorough': ignore the root's countdown self-termination as
+                  a stop signal, so the run continues to the full `iterations`
+                  budget. It stops earlier only on TRUE EXHAUSTION - when
+                  terminations cascade up to the root, i.e. the root becomes
+                  fully expanded AND all its children are terminated (detected
+                  in _select, which raises AllChildrenTerminated). Because a
+                  node with unexpanded children is never structurally
+                  terminated, exhaustion means the reachable space has been
+                  fully attached. Explores more compounds for a better top-N
+                  list, at the cost of more evaluations.
+                In BOTH modes a node's countdown can still flag it terminated
+                and selection always skips terminated children; the mode only
+                governs whether the root's countdown-termination *ends the run*.
             seed: Optional RNG seed for reproducibility.
         """
         if rollout_aggregation not in ("max", "mean"):
@@ -98,11 +118,16 @@ class MCTS(Generic[M]):
                 f"rollout_aggregation must be 'max' or 'mean', "
                 f"got {rollout_aggregation!r}"
             )
+        if search_mode not in ("fast", "thorough"):
+            raise ValueError(
+                f"search_mode must be 'fast' or 'thorough', got {search_mode!r}"
+            )
         self.exploration_constant = exploration_constant
         self.termination_limit = termination_limit
         self.rollout_depth = rollout_depth
         self.n_rollout = max(1, n_rollout)
         self.rollout_aggregation = rollout_aggregation
+        self.search_mode = search_mode
 
         self.root: SearchNode[M] = SearchNode(
             root_material,
@@ -140,16 +165,22 @@ class MCTS(Generic[M]):
         """
         Run the search for up to `iterations` iterations.
 
-        Stops early if the entire tree is exhausted (root terminated /
-        all branches dead).
+        Stopping depends on search_mode:
+        - 'fast': stop on true exhaustion (self.terminated) OR when the root
+          self-terminates via its no-improvement countdown (root.terminated).
+        - 'thorough': stop only on true exhaustion; the root's countdown
+          termination is ignored so the full iteration budget is used.
         """
-        logger.info("Starting MCTS: %d iterations", iterations)
+        logger.info("Starting MCTS: %d iterations (mode=%s)",
+                    iterations, self.search_mode)
 
         for i in range(iterations):
             self.iteration = i
 
-            if self.terminated or self.root.terminated:
-                logger.info("Search space exhausted at iteration %d", i)
+            converged = self.root.terminated and self.search_mode == "fast"
+            if self.terminated or converged:
+                logger.info("Stopping at iteration %d (%s)", i,
+                            "exhausted" if self.terminated else "converged")
                 break
 
             try:

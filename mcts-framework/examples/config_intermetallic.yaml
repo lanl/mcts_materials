@@ -19,6 +19,8 @@ mcts:
   rollout_depth: 1
   n_rollout: 5
   rollout_aggregation: max      # max (optimistic, discounts extra samples) | mean
+  search_mode: fast             # fast (stop at convergence, fewest DFT calls)
+                                # | thorough (full budget, broader top-N list)
   seed: 0
   output_dir: mcts_results_intermetallic
 
