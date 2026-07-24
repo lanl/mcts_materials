@@ -19,9 +19,76 @@ regardless.
 
 ## Current status
 
-Test suite: **162 passed, 2 skipped** (`pytest` from the `mcts-framework/` dir).
+Test suite: **203 passed, 2 skipped** (`pytest` from the `mcts-framework/` dir).
 The 2 skips are RDKit-dependent molecule tests (RDKit not installed in the
 current env — see caveats).
+
+### Postprocessing subpackage (done this session)
+
+Ported the analysis figures/tables from the original `mcts_crystal`
+`analysis/*/generate_figures.py` scripts into one reusable, config-driven
+`src/mcts_framework/postprocessing/` package (no per-study duplication):
+
+- **`design_space.py`** — `full_formula_key` (default ranking key, full
+  composition), `score_by_method` (reproduces all four reward classes exactly;
+  pinned to them by a test), `rank_design_space` (dispatches on the run's
+  `rollout_method`, attaches rDOS per-compound via the full formula — the old
+  f-block-stripping `tm_giv_key` machinery was deleted).
+- **`tables.py`** — `write_top_n_table`: N is a parameter; gamma/beta/data
+  paths/rollout_method read from the run's own `Config`; default ranks the full
+  design space; method-agnostic columns (r_DOS, r_ehull, Reward).
+- **`scatter.py`** — `plot_ehull_vs_rdos`: E_hull vs raw r_DOS backdrop + run
+  top-N overlay (matched by full-formula key); pluggable `space_filter`,
+  synthesized/attempted overlays.
+- **`radial_tree.py`** — `plot_radial_tree`: 4-panel radial tree
+  (reward / r_ehull / γ·r_DOS / Q·N⁻¹) from a run's persisted `tree.json`.
+- **`driver.py`** — `generate_study_outputs(run_dir)`: reads `config.yaml` +
+  `tree.json` and regenerates table + both figures into `run_dir/figures/`.
+  Exposed as `mcts-run figures --run-dir DIR`.
+- **Tree persistence**: `MCTS.to_tree_dict` / `save_tree_json` write the
+  explored tree as portable JSON; `save_results` writes `tree.json` +
+  `config.yaml` (mp_api_key redacted) by default.
+
+Commits on `refactor`: `9db399b` (tables/ranking), `b9897bf` (scatter + radial
+tree + tree persistence), `36bb531` (driver + `mcts-run figures` + README).
+
+### Next up: sweep harness (NOT done — cross-run figures)
+
+The single-run driver above cannot produce the three figures that aggregate
+across *many* runs. These are the last piece of the analysis port and require
+porting `sensitivity_studies/common.py`'s replicate-run harness (a parameter
+grid → many runs → aggregate), which is a different shape from the per-run
+driver.
+
+Figures still to port (originals in `analysis/*/generate_figures.py` and
+`sensitivity_studies/`):
+
+- **#4 convergence-by-starting-material** — run the search from several
+  starting compositions and overlay their convergence curves (best-reward vs
+  iteration). Original: `plot_convergence_by_starting_material` in
+  `analysis/ehull_rdos_u_only_study/generate_figures.py`.
+- **#5 sensitivity sweeps** — sweep a hyperparameter (exploration_constant,
+  selection_mode, termination_limit, …), replicate each setting with several
+  seeds, and plot the effect on convergence/coverage. Original harness:
+  `sensitivity_studies/scripts/common.py` (`BASELINE` dict + `run_replicate`,
+  using `override_composition` and `max_reward_history`).
+- **#6 iterations-vs-termination** — how final coverage / best reward scales
+  with `iterations` and `termination_limit`.
+
+Porting notes / gaps to bridge when we resume:
+- `common.py` uses `override_composition` (start-material override); the
+  framework equivalent is building the root `IntermetallicStructure` with the
+  substituted composition, or the config `transition_metal`/`group_iv`
+  overrides on `IntermetallicConfig`.
+- `common.py`'s `max_reward_history` maps to the framework's
+  `MCTS.reward_history` (already persisted as `convergence.csv`).
+- Likely shape: a `postprocessing/sweeps.py` that runs a grid of configs
+  (varying one field), collects each run's `convergence.csv`/`summary.json`,
+  and emits the overlay/senstivity plots — plus an `mcts-run sweep` command or
+  a thin driver. Decide grid-runner vs. read-existing-runs when we resume.
+- `search_mode` interacts with #4/#6: use `thorough` for coverage-sensitive
+  sweeps so the root-convergence early stop doesn't cap breadth (see the
+  `search_mode` section above).
 
 ### Upstream sync (adopted latest mcts_crystal development)
 
@@ -119,8 +186,11 @@ See MIGRATION.md "Termination / search_mode" for the full comparison.
   retired: expansion + spglib identity + rdos reward path now confirmed;
   live MACE/MP energy path still unexercised).
 
-### Project status: feature-complete
-All planned phases (1-7) done. 138 passed, 2 skipped.
+### Project status
+
+Core framework + all material types + CLI + viz + postprocessing done. The
+cross-run **sweep harness** (#4/#5/#6, see "Next up" above) is the remaining
+analysis port. 203 passed, 2 skipped.
 
 (General reminder for future sessions: prior sessions have added files ahead of
 the todo; always `ls`/read before writing a "new" file to avoid duplicating

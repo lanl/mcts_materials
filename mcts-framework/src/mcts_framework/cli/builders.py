@@ -79,7 +79,9 @@ def _build_intermetallic(config: Config) -> Tuple[object, object, "PropertyEvalu
     atoms = read(ic.structure_path)
     root = IntermetallicStructure(atoms)
 
-    moves = PeriodicTableMoves(f_block_mode=ic.f_block_mode, move_step=ic.move_step)
+    moves = PeriodicTableMoves(
+        f_block_mode=ic.f_block_mode, move_step=ic.move_step, u_bridge=ic.u_bridge
+    )
     evaluator = MaceEvaluator(cache_path=ic.cache_path, mp_api_key=ic.mp_api_key)
 
     # DOSCAR lookup needed for the rDOS-using methods.

@@ -193,8 +193,11 @@ The intermetallic rewards preserve the validated constants from `mcts_crystal`:
 ### Search behavior (matches current `mcts_crystal`)
 - **`move_step`** (intermetallic): max positions a substitution may jump along
   the transition-metal / Group IV / lanthanide axes (default 1 = adjacent;
-  3 = extended-range). Unifies the old `lanthanides_u` / `lanthanides_u_extended`
-  distinction.
+  3 = extended-range). This is the sole knob for jump distance.
+- **`u_bridge`** (intermetallic): which lanthanides U(92) connects to in the
+  lanthanide/U modes — `narrow` (Nd only, default) or `wide` (Nd/Gd/Er).
+  `move_step` (jump distance) and `u_bridge` (U connectivity) are orthogonal;
+  together they replace the old conflated `lanthanides_u_extended` mode.
 - **`rollout_aggregation`** (core): how a node's `n_rollout` samples combine —
   `max` (default; extra samples discounted by `0.9**rollout_depth`) or `mean`
   (unbiased average of undiscounted samples).

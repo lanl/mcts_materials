@@ -16,7 +16,7 @@ fails fast with a clear message instead of deep in the search.
 import json
 from typing import Any, ClassVar, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 # --- F-block substitution modes ------------------------------------------
@@ -25,32 +25,28 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 # plus U(92). They differ only in which MOVES (edges) are allowed:
 #
 #   u_only                  : f-block frozen at U; no lanthanide moves.
-#   lanthanides_u           : +/-1 neighbor, WITH wrap-around (Ce<->Lu);
-#                             U bridges to/from Nd only.
-#   lanthanides_u_extended  : +/-1,2,3 jumps, WITH wrap-around; U bridges
-#                             to/from Nd, Gd, Er (light/mid/heavy).
-#   lanthanides_u_no_wrap   : +/-1 neighbor, NO wrap-around (Ce/Lu are chain
-#                             ends); U bridges to/from Nd only. (Was named
-#                             "experimental"; its old code comment mislabeled
-#                             the set as actinides - it is lanthanides.)
+#   lanthanides_u           : +/-move_step neighbors, WITH wrap-around (Ce<->Lu),
+#                             plus the U bridge (see u_bridge below).
+#   lanthanides_u_no_wrap   : +/-move_step neighbors, NO wrap-around (Ce/Lu are
+#                             chain ends), plus the U bridge.
 #   full_f_block            : lanthanides Ce-Lu + actinides Th(90)-Pu(94),
 #                             +/-1 neighbors plus vertical Ln<->An analog moves.
 #
-# Canonical names are the values below. Deprecated aliases are normalized to
-# their canonical form by a validator.
+# The lanthanide jump range is set by move_step (not the mode), and the U
+# bridge width by u_bridge - both are orthogonal to the mode. (The former
+# "lanthanides_u_extended" mode conflated these; it is gone - use
+# lanthanides_u with move_step and/or u_bridge='wide' instead.)
 
 FBlockMode = Literal[
     "u_only",
     "lanthanides_u",
-    "lanthanides_u_extended",
     "lanthanides_u_no_wrap",
     "full_f_block",
 ]
 
-# Deprecated -> canonical alias map.
-_F_BLOCK_ALIASES: Dict[str, str] = {
-    "experimental": "lanthanides_u_no_wrap",
-}
+# U-bridge widths: which lanthanides U(92) connects to. 'narrow' = Nd only;
+# 'wide' = Nd/Gd/Er. Orthogonal to f_block_mode and move_step.
+UBridge = Literal["narrow", "wide"]
 
 
 class MCTSConfig(BaseModel):
@@ -100,19 +96,16 @@ class IntermetallicConfig(BaseModel):
     structure_path: str = Field(..., description="Path to starting CIF file")
 
     # See the module-level FBlockMode notes for exact per-mode move rules.
-    # The deprecated alias "experimental" is accepted and normalized to
-    # "lanthanides_u_no_wrap".
     f_block_mode: FBlockMode = Field(
         "u_only",
         description=(
             "F-block move rules. All lanthanide/U modes share the Ce-Lu + U "
             "element set and differ only in allowed moves: "
             "u_only (frozen at U); "
-            "lanthanides_u (+/-1, wrap-around, U<->Nd); "
-            "lanthanides_u_extended (+/-1..3, wrap-around, U<->Nd/Gd/Er); "
-            "lanthanides_u_no_wrap (+/-1, no wrap, U<->Nd; formerly "
-            "'experimental'); "
-            "full_f_block (Ce-Lu + Th-Pu, +/-1 plus vertical Ln<->An analogs)."
+            "lanthanides_u (+/-move_step, wrap-around, plus U bridge); "
+            "lanthanides_u_no_wrap (+/-move_step, no wrap, plus U bridge); "
+            "full_f_block (Ce-Lu + Th-Pu, +/-1 plus vertical Ln<->An analogs). "
+            "Jump range is set by move_step and the U bridge by u_bridge."
         ),
     )
 
@@ -122,6 +115,13 @@ class IntermetallicConfig(BaseModel):
         description="Max positions a substitution may jump along the "
         "transition-metal / Group IV / lanthanide axes (1 = adjacent only; "
         "3 = extended-range exploration)",
+    )
+
+    u_bridge: UBridge = Field(
+        "narrow",
+        description="Which lanthanides U(92) connects to in the lanthanide/U "
+        "modes: 'narrow' (Nd only) or 'wide' (Nd/Gd/Er). Orthogonal to "
+        "f_block_mode and move_step; ignored by u_only / full_f_block.",
     )
 
     rollout_method: Literal[
@@ -145,14 +145,6 @@ class IntermetallicConfig(BaseModel):
     group_iv: Optional[str] = Field(None, description="Override Group IV element")
 
     model_config = {"extra": "forbid"}
-
-    @field_validator("f_block_mode", mode="before")
-    @classmethod
-    def _normalize_f_block_alias(cls, v: Any) -> Any:
-        """Map deprecated f_block_mode aliases to their canonical name."""
-        if isinstance(v, str) and v in _F_BLOCK_ALIASES:
-            return _F_BLOCK_ALIASES[v]
-        return v
 
     @model_validator(mode="after")
     def _check_reward_requirements(self) -> "IntermetallicConfig":

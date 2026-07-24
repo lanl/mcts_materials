@@ -26,12 +26,12 @@ mcts:
 
 intermetallic:
   structure_path: examples/mat_Pb6U1W6_sg191.cif
-  f_block_mode: u_only          # u_only | lanthanides_u | lanthanides_u_extended
-                                # | lanthanides_u_no_wrap | full_f_block
-                                # ('experimental' is accepted as a deprecated
-                                #  alias for lanthanides_u_no_wrap)
+  f_block_mode: u_only          # u_only | lanthanides_u | lanthanides_u_no_wrap
+                                # | full_f_block
   move_step: 1                  # max jump per substitution along TM/Group-IV/
                                 # lanthanide axes (1 = adjacent; 3 = extended)
+  u_bridge: narrow              # lanthanide/U modes: which lanthanides U links
+                                # to - narrow (Nd only) | wide (Nd/Gd/Er)
   rollout_method: rdos          # rdos (no API key) | ehull | ehull_rdos
                                 # | ehull_rdos_product (multiplicative:
                                 #   ehull_reward * r_DOS, needs key+DOSCAR)
@@ -39,6 +39,6 @@ intermetallic:
   gamma: 0.0001                 # rDOS weight  (ehull_rdos only)
 
   # Data / credentials:
-  doscar_data_path: doscar_peaks_data_with_U.csv  # required for rdos/ehull_rdos
+  doscar_data_path: examples/doscar_peaks_data_with_U.csv  # required for rdos/ehull_rdos
   mp_api_key: null              # required for ehull/ehull_rdos (not rdos)
   cache_path: null              # optional MACE energy cache CSV

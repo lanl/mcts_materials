@@ -98,40 +98,51 @@ def metal_moves(atomic_num: int, move_step: int = 1) -> List[int]:
     return sorted(mv)
 
 
-def f_block_moves(atomic_num: int, mode: str, move_step: int = 1) -> List[int]:
+# U(92) bridge widths: which lanthanides U connects to (and which connect back
+# to U). 'narrow' = Nd only; 'wide' = Nd/Gd/Er (light/mid/heavy). This is
+# orthogonal to move_step (jump distance) and to wrap-around (mode).
+_U_BRIDGE_LANTHANIDES = {
+    "narrow": (60,),        # Nd
+    "wide": (60, 64, 68),   # Nd, Gd, Er
+}
+
+
+def f_block_moves(
+    atomic_num: int,
+    mode: str,
+    move_step: int = 1,
+    u_bridge: str = "narrow",
+) -> List[int]:
     """
     F-block moves under the given mode.
 
     Modes (canonical names; see core.config for the alias handling):
         u_only                 : [92] only.
-        lanthanides_u          : +/-move_step with wrap-around (Ce<->Lu); U<->Nd.
-        lanthanides_u_extended : +/-move_step with wrap-around; U<->Nd/Gd/Er.
-        lanthanides_u_no_wrap  : +/-move_step, no wrap; U<->Nd. (formerly 'experimental')
+        lanthanides_u          : +/-move_step with wrap-around (Ce<->Lu); U bridge.
+        lanthanides_u_no_wrap  : +/-move_step, no wrap; U bridge.
         full_f_block           : Ce-Lu + Th-Pu, +/-1 plus vertical Ln<->An.
 
-    move_step controls the lanthanide jump range for the lanthanide/U modes
-    (default 1 = adjacent). lanthanides_u and lanthanides_u_extended differ
-    only in the U bridge (Nd vs. Nd/Gd/Er). full_f_block ignores move_step
-    (its +/-1 neighbor + vertical analog structure is fixed).
+    Two orthogonal knobs control the lanthanide/U modes:
+      - move_step: lanthanide jump range (default 1 = adjacent; larger = farther).
+      - u_bridge : which lanthanides U(92) connects to - 'narrow' (Nd only) or
+        'wide' (Nd/Gd/Er). Independent of jump distance and wrap-around.
+    full_f_block ignores both (its +/-1 neighbor + vertical analog structure is
+    fixed and has no U bridge).
 
     Returns a sorted, de-duplicated list of atomic numbers.
     """
     lanthanides = list(range(58, 72))  # Ce(58)..Lu(71)
+    bridge = _U_BRIDGE_LANTHANIDES.get(u_bridge, _U_BRIDGE_LANTHANIDES["narrow"])
+
+    def _add_u_bridge(possible: List[int]) -> None:
+        """Connect U(92) to its bridge lanthanides, and those back to U."""
+        if atomic_num == 92:
+            possible.extend(bridge)
+        elif atomic_num in bridge:
+            possible.append(92)
 
     if mode == "u_only":
         possible = [92]
-
-    elif mode == "lanthanides_u_extended":
-        possible = [atomic_num]
-        if atomic_num in lanthanides:
-            idx = lanthanides.index(atomic_num)
-            for delta in range(-move_step, move_step + 1):
-                if delta != 0:
-                    possible.append(lanthanides[(idx + delta) % len(lanthanides)])
-        if atomic_num == 92:
-            possible.extend([60, 64, 68])  # Nd, Gd, Er
-        elif atomic_num in (60, 64, 68):
-            possible.append(92)
 
     elif mode == "lanthanides_u":
         possible = [atomic_num]
@@ -140,14 +151,10 @@ def f_block_moves(atomic_num: int, mode: str, move_step: int = 1) -> List[int]:
             for delta in range(-move_step, move_step + 1):
                 if delta != 0:
                     possible.append(lanthanides[(idx + delta) % len(lanthanides)])
-        if atomic_num == 92:
-            possible.append(60)  # U -> Nd
-        elif atomic_num == 60:
-            possible.append(92)  # Nd -> U
+        _add_u_bridge(possible)
 
     elif mode == "lanthanides_u_no_wrap":
         # +/-move_step neighbors, NO wrap-around (Ce/Lu are chain ends).
-        # Formerly 'experimental'; its old comment mislabeled the set as actinides.
         possible = [atomic_num]
         if atomic_num in lanthanides:
             idx = lanthanides.index(atomic_num)
@@ -156,10 +163,7 @@ def f_block_moves(atomic_num: int, mode: str, move_step: int = 1) -> List[int]:
                     possible.append(lanthanides[idx - delta])
                 if idx + delta < len(lanthanides):
                     possible.append(lanthanides[idx + delta])
-        if atomic_num == 92:
-            possible.append(60)  # U -> Nd
-        elif atomic_num == 60:
-            possible.append(92)  # Nd -> U
+        _add_u_bridge(possible)
 
     else:  # full_f_block
         actinides = list(range(90, 95))  # Th(90)..Pu(94)

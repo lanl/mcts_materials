@@ -85,14 +85,33 @@ def test_f_block_lanthanides_u_u_to_nd():
     assert 92 in moves
 
 
-def test_f_block_extended_range_and_bridges():
-    # From U: Nd, Gd, Er bridges
-    moves = elements.f_block_moves(92, "lanthanides_u_extended")
-    assert set([60, 64, 68]).issubset(set(moves))
-    # From a lanthanide, +/-3 reachable (with wrap)
-    moves_ce = elements.f_block_moves(58, "lanthanides_u_extended")
-    # Ce idx 0; +3 -> idx3 = Nd(61? ) compute: lanthanides[3]=61 (Pm). Just check length > lanthanides_u
-    assert len(moves_ce) >= len(elements.f_block_moves(58, "lanthanides_u"))
+def test_u_bridge_wide_connects_nd_gd_er():
+    # u_bridge='wide' connects U to Nd(60), Gd(64), Er(68); 'narrow' only Nd.
+    wide = elements.f_block_moves(92, "lanthanides_u", u_bridge="wide")
+    assert {60, 64, 68}.issubset(set(wide))
+    narrow = elements.f_block_moves(92, "lanthanides_u", u_bridge="narrow")
+    assert 60 in narrow and 64 not in narrow and 68 not in narrow
+
+
+def test_u_bridge_wide_lanthanides_connect_back_to_u():
+    # Under 'wide', Gd(64) and Er(68) gain a bridge back to U; under 'narrow'
+    # only Nd(60) does.
+    assert 92 in elements.f_block_moves(64, "lanthanides_u", u_bridge="wide")
+    assert 92 in elements.f_block_moves(68, "lanthanides_u", u_bridge="wide")
+    assert 92 not in elements.f_block_moves(64, "lanthanides_u", u_bridge="narrow")
+
+
+def test_u_bridge_is_orthogonal_to_move_step():
+    # u_bridge only touches the U connectivity; the lanthanide jump set (from a
+    # non-bridge lanthanide) is identical regardless of u_bridge.
+    a = elements.f_block_moves(59, "lanthanides_u", move_step=3, u_bridge="narrow")
+    b = elements.f_block_moves(59, "lanthanides_u", move_step=3, u_bridge="wide")
+    assert a == b  # Pr(59) is not a bridge lanthanide, so U-bridge width is moot
+
+
+def test_u_bridge_defaults_to_narrow():
+    assert (elements.f_block_moves(92, "lanthanides_u")
+            == elements.f_block_moves(92, "lanthanides_u", u_bridge="narrow"))
 
 
 def test_f_block_no_wrap_has_no_wraparound():
@@ -142,14 +161,15 @@ def test_move_step_group_iv():
     assert elements.group_iv_moves(14, move_step=1) == [14, 32]
 
 
-def test_move_step_lanthanides_extended_equivalence():
-    # lanthanides_u at move_step=3 reproduces the old lanthanides_u_extended
-    # lanthanide jump set (both wrap; extended's only extra is the U bridge).
+def test_move_step_sets_lanthanide_jump_range():
+    # move_step is the sole knob for lanthanide jump distance: move_step=3 from
+    # Gd(64) reaches +/-3 neighbors with wrap. (The old lanthanides_u_extended
+    # mode, which conflated jump range with the U bridge, has been removed.)
     ln = list(range(58, 72))
     idx = ln.index(64)
     core = sorted({64} | {ln[(idx + d) % len(ln)] for d in range(-3, 4) if d != 0})
     got = elements.f_block_moves(64, "lanthanides_u", move_step=3)
-    # Gd(64) also bridges to U(92) under lanthanides_u? No - only Nd(60) does.
+    # Gd(64) does not bridge to U(92) under the default narrow bridge (only Nd).
     assert got == core
 
 

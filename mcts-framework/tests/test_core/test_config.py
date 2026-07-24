@@ -144,7 +144,6 @@ def test_f_block_mode_canonical_values():
     for mode in [
         "u_only",
         "lanthanides_u",
-        "lanthanides_u_extended",
         "lanthanides_u_no_wrap",
         "full_f_block",
     ]:
@@ -157,15 +156,43 @@ def test_f_block_mode_canonical_values():
         assert cfg.f_block_mode == mode
 
 
-def test_f_block_mode_experimental_alias():
-    """Deprecated 'experimental' normalizes to 'lanthanides_u_no_wrap'."""
+def test_lanthanides_u_extended_mode_rejected():
+    # The conflated 'extended' mode was removed; use move_step + u_bridge instead.
+    with pytest.raises(ValidationError):
+        IntermetallicConfig(
+            structure_path="foo.cif",
+            rollout_method="rdos",
+            doscar_data_path="d.csv",
+            f_block_mode="lanthanides_u_extended",
+        )
+
+
+def test_u_bridge_values_and_default():
     cfg = IntermetallicConfig(
-        structure_path="foo.cif",
-        rollout_method="rdos",
-        doscar_data_path="d.csv",
-        f_block_mode="experimental",
+        structure_path="foo.cif", rollout_method="rdos", doscar_data_path="d.csv",
     )
-    assert cfg.f_block_mode == "lanthanides_u_no_wrap"
+    assert cfg.u_bridge == "narrow"  # default
+    cfg_wide = IntermetallicConfig(
+        structure_path="foo.cif", rollout_method="rdos", doscar_data_path="d.csv",
+        f_block_mode="lanthanides_u", u_bridge="wide",
+    )
+    assert cfg_wide.u_bridge == "wide"
+    with pytest.raises(ValidationError):
+        IntermetallicConfig(
+            structure_path="foo.cif", rollout_method="rdos",
+            doscar_data_path="d.csv", u_bridge="bogus",
+        )
+
+
+def test_f_block_mode_experimental_removed():
+    """The former 'experimental' alias is gone; use lanthanides_u_no_wrap."""
+    with pytest.raises(ValidationError):
+        IntermetallicConfig(
+            structure_path="foo.cif",
+            rollout_method="rdos",
+            doscar_data_path="d.csv",
+            f_block_mode="experimental",
+        )
 
 
 def test_f_block_mode_invalid():
@@ -259,7 +286,7 @@ def test_config_from_yaml(tmp_path):
             "structure_path": "foo.cif",
             "rollout_method": "rdos",
             "doscar_data_path": "d.csv",
-            "f_block_mode": "experimental",
+            "f_block_mode": "lanthanides_u_no_wrap",
         },
     }
     p = tmp_path / "config.yaml"
@@ -267,5 +294,4 @@ def test_config_from_yaml(tmp_path):
 
     cfg = Config.from_yaml(str(p))
     assert cfg.mcts.selection_mode == "puct"
-    # alias normalized
     assert cfg.intermetallic.f_block_mode == "lanthanides_u_no_wrap"
