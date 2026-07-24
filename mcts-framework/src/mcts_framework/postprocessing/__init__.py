@@ -13,6 +13,8 @@ Modules:
                    rank the design space (the "true" ranking used to check MCTS
                    search coverage).
     tables       : LaTeX top-N candidate tables (N configurable).
+    scatter      : E_hull vs weighted-rDOS scatter (design space + run top-N).
+    radial_tree  : radial search-tree figure from a run's persisted tree.json.
 
 © 2026. Triad National Security, LLC. All rights reserved.
 """
@@ -23,6 +25,8 @@ from .design_space import (
     rank_design_space,
     score_by_method,
 )
+from .radial_tree import plot_radial_tree
+from .scatter import plot_ehull_vs_rdos
 from .tables import write_top_n_table
 
 __all__ = [
@@ -31,4 +35,6 @@ __all__ = [
     "load_design_space",
     "rank_design_space",
     "write_top_n_table",
+    "plot_ehull_vs_rdos",
+    "plot_radial_tree",
 ]

@@ -31,6 +31,7 @@ def save_results(
     output_dir: str,
     top_n: int = 20,
     config: Optional[Config] = None,
+    save_tree: bool = True,
 ) -> Dict[str, str]:
     """
     Write summary, best-materials, and convergence files to output_dir.
@@ -42,6 +43,9 @@ def save_results(
         config: The run's Config. When given, it is persisted (secrets redacted)
             as config.yaml so post-run analysis can read the run's own gamma,
             beta, and data paths instead of re-specifying them.
+        save_tree: When True (default), also write tree.json - the explored
+            search tree (structure + per-node stats/properties) - so the radial
+            search-tree figure can be regenerated offline without re-running.
 
     Returns:
         Mapping of logical name -> written file path.
@@ -64,6 +68,10 @@ def save_results(
     if config is not None:
         paths["config"] = str(out / "config.yaml")
         config.dump_yaml(paths["config"])
+
+    if save_tree:
+        paths["tree"] = str(out / "tree.json")
+        mcts.save_tree_json(paths["tree"])
 
     logger.info("Saved results to %s", out)
     return paths

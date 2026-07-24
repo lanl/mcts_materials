@@ -433,6 +433,42 @@ class MCTS(Generic[M]):
             stack.extend(n.children)
         return out
 
+    def to_tree_dict(self) -> Dict[str, Any]:
+        """
+        Serialize the explored tree to a portable, JSON-safe dict.
+
+        Captures structure (parent links) plus each node's identifier and MCTS
+        statistics (own_reward, visits, total_reward, subtree_best) and its
+        evaluated properties - enough to redraw the search tree offline without
+        re-running the search or unpickling live objects (ASE Atoms, evaluator
+        handles). Node ids are indices into a DFS ordering; the root is id 0.
+        """
+        nodes = self.all_nodes()
+        index = {id(n): i for i, n in enumerate(nodes)}
+        records = []
+        for i, n in enumerate(nodes):
+            records.append({
+                "id": i,
+                "parent": index[id(n.parent)] if n.parent is not None else None,
+                "identifier": n.material.get_identifier(),
+                "own_reward": n.own_reward,
+                "visits": n.visits,
+                "total_reward": n.total_reward,
+                "subtree_best": (
+                    None if n.subtree_best == float("-inf") else n.subtree_best
+                ),
+                "terminated": n.terminated,
+                "properties": dict(n.properties),
+            })
+        return {"root_id": 0, "nodes": records}
+
+    def save_tree_json(self, path: str) -> None:
+        """Write to_tree_dict() to a JSON file."""
+        import json
+
+        with open(path, "w") as f:
+            json.dump(self.to_tree_dict(), f, indent=2)
+
     def get_best_materials(self, n: int = 10) -> List[SearchNode[M]]:
         """
         Return the top-n nodes ranked by their OWN evaluated reward.

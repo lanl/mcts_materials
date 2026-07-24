@@ -134,6 +134,12 @@ async def test_save_results_writes_files(tmp_path):
     assert (out_dir / "report.txt").exists()
     assert "MCTS Materials Search Report" in (out_dir / "report.txt").read_text()
 
+    # The explored tree is persisted by default for offline figure regeneration.
+    assert "tree" in paths
+    assert (out_dir / "tree.json").exists()
+    tree = json.loads((out_dir / "tree.json").read_text())
+    assert tree["root_id"] == 0 and tree["nodes"]
+
 
 @pytest.mark.asyncio
 async def test_convergence_rows_match_iterations(tmp_path):
