@@ -93,6 +93,41 @@ def run(
 
 
 @app.command()
+def figures(
+    run_dir: str = typer.Option(..., "--run-dir", "-r", help="A finished run directory"),
+    out_dir: str = typer.Option(None, "--out-dir", "-o", help="Where to write figures (default: run-dir/figures)"),
+    top_n: int = typer.Option(15, "--top-n", "-n", help="Top-N table length"),
+) -> None:
+    """
+    Regenerate a study's table and figures from a finished run directory.
+
+    Reads run-dir/config.yaml and run-dir/tree.json (written by `run`) and
+    produces the top-N LaTeX table, the E_hull-vs-rDOS scatter, and the radial
+    search tree - all keyed off the run's own config, so no parameters are
+    re-specified here.
+    """
+    try:
+        from ..postprocessing import generate_study_outputs
+    except ImportError as exc:
+        typer.secho(
+            f"Missing plotting dependency: {exc}\nInstall the viz extra: "
+            f"pip install -e '.[viz]'",
+            fg=typer.colors.RED, err=True,
+        )
+        raise typer.Exit(code=1)
+
+    try:
+        produced = generate_study_outputs(run_dir, out_dir=out_dir, top_n=top_n)
+    except (FileNotFoundError, ValueError) as exc:
+        typer.secho(f"Cannot generate figures: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
+    typer.secho("Figures generated.", fg=typer.colors.GREEN, bold=True)
+    for name, path in produced.items():
+        typer.echo(f"  - {name}: {path}")
+
+
+@app.command()
 def validate(
     config: str = typer.Option(..., "--config", "-c", help="Path to YAML/JSON config"),
 ) -> None:

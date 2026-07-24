@@ -15,6 +15,7 @@ Modules:
     tables       : LaTeX top-N candidate tables (N configurable).
     scatter      : E_hull vs weighted-rDOS scatter (design space + run top-N).
     radial_tree  : radial search-tree figure from a run's persisted tree.json.
+    driver       : one generic driver regenerating a study's outputs from a run.
 
 © 2026. Triad National Security, LLC. All rights reserved.
 """
@@ -24,6 +25,11 @@ from .design_space import (
     load_design_space,
     rank_design_space,
     score_by_method,
+)
+from .driver import (
+    generate_study_outputs,
+    load_run_config,
+    load_run_dataframe,
 )
 from .radial_tree import plot_radial_tree
 from .scatter import plot_ehull_vs_rdos
@@ -37,4 +43,7 @@ __all__ = [
     "write_top_n_table",
     "plot_ehull_vs_rdos",
     "plot_radial_tree",
+    "generate_study_outputs",
+    "load_run_config",
+    "load_run_dataframe",
 ]

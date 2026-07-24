@@ -88,6 +88,33 @@ Each run writes to the configured `output_dir`:
 - `best_materials.csv` — top materials ranked by own reward, with properties
 - `convergence.csv` — per-iteration best reward and unique-material count
 - `report.txt` — human-readable analysis report
+- `config.yaml` — the exact config the run used (Materials Project key redacted)
+- `tree.json` — the explored search tree (structure + per-node stats/properties)
+
+### Post-run figures & tables
+
+`config.yaml` and `tree.json` make each run self-describing, so publication
+figures are regenerated straight from a finished run directory — no per-study
+script and no parameters to re-specify (gamma, reward method, and data paths all
+come from the run's own `config.yaml`):
+
+```bash
+mcts-run run     --config study.yaml       # writes results + config.yaml + tree.json
+mcts-run figures --run-dir mcts_results    # regenerates table + both figures
+```
+
+`mcts-run figures` writes into `<run-dir>/figures/` (override with `--out-dir`):
+
+- `top{N}_table.tex` — top-N candidate LaTeX table (`--top-n`, default 15), with
+  a "True Rank" column ranking each pick against the full design space
+- `ehull_vs_rdos.png` — E_hull vs r_DOS scatter: full design space (backdrop)
+  plus the run's top-N overlay
+- `radial_tree.png` — 4-panel radial search tree (reward / r_ehull / γ·r_DOS /
+  Q·N⁻¹), root starred, expansion edges bold
+
+Needs the `[viz]` extra (and, for intermetallics, the MACE cache + DOSCAR data
+referenced by the config). The same outputs are available programmatically via
+`mcts_framework.postprocessing.generate_study_outputs(run_dir)`.
 
 ### Python API
 
@@ -134,6 +161,7 @@ mcts-framework/
 │   ├── intermetallic/  # Crystal structures, periodic-table moves, MACE/MP evaluator, rewards
 │   ├── molecule/       # RDKit structures, functional-group moves, ML evaluator, rewards
 │   ├── viz/            # Analysis (metrics/report) and plots (convergence/tree/distribution)
+│   ├── postprocessing/ # Regenerate study outputs from a run: tables, scatter, radial tree, driver
 │   └── cli/            # `mcts-run` entry point (Typer): main, builders, results
 ├── tests/              # pytest suite (core is dependency-free; material tests skip if deps absent)
 ├── examples/           # Config templates, run_intermetallic.py, run_molecule.py, custom_material.py
