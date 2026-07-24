@@ -129,7 +129,9 @@ class IntermetallicConfig(BaseModel):
     ] = "ehull"
     beta: float = Field(1.0, description="E_hull weight (ehull_rdos)")
     gamma: float = Field(
-        0.0001, description="rDOS weight (ehull_rdos / ehull_rdos_product)"
+        0.0001,
+        description="rDOS weight (ehull_rdos only; ehull_rdos_product is "
+        "ehull_reward * r_DOS and ignores gamma)",
     )
 
     mp_api_key: Optional[str] = Field(None, description="Materials Project API key")

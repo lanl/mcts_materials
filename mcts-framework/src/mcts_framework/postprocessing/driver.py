@@ -19,7 +19,7 @@ from typing import Callable, Dict, Hashable, List, Optional, Sequence
 import pandas as pd
 
 from ..core.config import Config
-from .design_space import full_formula_key
+from .design_space import full_formula_key, load_design_space
 from .radial_tree import plot_radial_tree
 from .scatter import plot_ehull_vs_rdos
 from .tables import write_top_n_table
@@ -31,8 +31,16 @@ def load_run_dataframe(tree_path: str) -> pd.DataFrame:
 
     Collapses the tree to one row per unique material that was actually
     evaluated (own_reward set), taking that node's own_reward and properties
-    (e_above_hull, e_form, ...). This is the run-results table the table/scatter
-    consume; it comes from the persisted tree so no separate CSV is required.
+    (e_above_hull, e_form, formula, ...). This is the run-results table the
+    table/scatter consume; it comes from the persisted tree so no separate CSV
+    is required.
+
+    The 'name' column is the plain chemical formula (from the node's 'formula'
+    property), NOT the full identifier - the identifier carries the
+    '|SG|Wyckoff' suffix, which the composition-based ranking keys cannot parse.
+    Dedup is still on the full identifier, so distinct site decorations at equal
+    composition are kept as separate rows. The identifier is preserved in its
+    own column.
     """
     with open(tree_path) as f:
         tree = json.load(f)
@@ -41,12 +49,21 @@ def load_run_dataframe(tree_path: str) -> pd.DataFrame:
     for rec in tree.get("nodes", []):
         if rec.get("own_reward") is None:
             continue
-        name = str(rec["identifier"])
-        if name in rows:
+        identifier = str(rec["identifier"])
+        if identifier in rows:
             continue  # first (root-ward) evaluation wins; identical material
-        row = {"name": name, "own_reward": rec["own_reward"], "visits": rec.get("visits", 0)}
-        row.update(rec.get("properties") or {})
-        rows[name] = row
+        props = rec.get("properties") or {}
+        # Prefer the plain 'formula' property as the display/ranking name;
+        # fall back to the identifier if a material type doesn't record one.
+        name = str(props.get("formula", identifier))
+        row = {
+            "name": name,
+            "identifier": identifier,
+            "own_reward": rec["own_reward"],
+            "visits": rec.get("visits", 0),
+        }
+        row.update(props)
+        rows[identifier] = row
 
     return pd.DataFrame(list(rows.values()))
 
@@ -107,6 +124,15 @@ def generate_study_outputs(
             f"explored tree is persisted for analysis."
         )
     df = load_run_dataframe(str(tree_path))
+
+    # The search only records e_form/e_above_hull/formula on each node, not the
+    # rDOS - so recompute r_DOS per compound from the run's DOSCAR data (the same
+    # lookup rank_design_space uses). Without this the table/scatter would treat
+    # r_DOS as 0, silently zeroing any rDOS-dependent reward (e.g. the product).
+    ic = config.intermetallic
+    if ic is not None and ic.doscar_data_path and "name" in df.columns and len(df):
+        _, doscar_lookup = load_design_space(ic.cache_path or "", ic.doscar_data_path)
+        df["r_DOS"] = df["name"].apply(doscar_lookup.get_reward)
 
     produced: Dict[str, str] = {}
 

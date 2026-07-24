@@ -96,7 +96,7 @@ async def test_save_results_writes_files(tmp_path):
     """Run a tiny toy MCTS and confirm all three result files are written."""
     from mcts_framework.core.mcts import MCTS
     from mcts_framework.core.selection import UCB1
-    from tests.test_core.test_mcts import (  # reuse toy classes
+    from conftest import (  # shared toy classes (see tests/conftest.py)
         IntMaterial,
         LineMoves,
         DistanceEvaluator,
@@ -146,7 +146,7 @@ async def test_convergence_rows_match_iterations(tmp_path):
     import pandas as pd
     from mcts_framework.core.mcts import MCTS
     from mcts_framework.core.selection import UCB1
-    from tests.test_core.test_mcts import (
+    from conftest import (
         IntMaterial,
         LineMoves,
         DistanceEvaluator,
