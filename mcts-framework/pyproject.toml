@@ -84,6 +84,7 @@ packages = [
     "mcts_framework.intermetallic",
     "mcts_framework.molecule",
     "mcts_framework.cli",
+    "mcts_framework.postprocessing",
 ]
 # Note: intermetallic and molecule import their heavy deps (ase/mace/pymatgen,
 # rdkit/molecule-modifier) lazily; the core stays lightweight.

@@ -80,7 +80,7 @@ def run(
     )
     asyncio.run(mcts.run(cfg.mcts.iterations))
 
-    paths = save_results(mcts, cfg.mcts.output_dir)
+    paths = save_results(mcts, cfg.mcts.output_dir, config=cfg)
 
     summary = mcts.summary()
     typer.secho("\nSearch complete.", fg=typer.colors.GREEN, bold=True)

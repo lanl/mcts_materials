@@ -14,7 +14,7 @@ fails fast with a clear message instead of deep in the search.
 """
 
 import json
-from typing import Literal, Optional, Dict, List, Any
+from typing import Any, ClassVar, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -252,3 +252,32 @@ class Config(BaseModel):
         with open(path) as f:
             data = json.load(f)
         return cls(**data)
+
+    # ---------------------------------------------------------------- #
+    # Persistence
+    # ---------------------------------------------------------------- #
+
+    #: Placeholder written in place of a real secret when redacting.
+    REDACTED_PLACEHOLDER: ClassVar[str] = "<redacted>"
+
+    def dump_yaml(self, path: str, redact_secrets: bool = True) -> None:
+        """
+        Write this config to a YAML file next to a run's results.
+
+        Persisting the exact config a run used lets post-run analysis read back
+        the same parameters (gamma, beta, data paths) instead of re-specifying
+        them. With redact_secrets=True (default) the Materials Project API key is
+        replaced by a placeholder so the file is safe to keep alongside
+        shareable outputs. A placeholder (rather than a blank) is used so the
+        redacted file still passes validation on reload via from_yaml - some
+        rollout methods require a non-empty key - though it obviously cannot run
+        a live energy calculation until a real key is restored.
+        """
+        import yaml  # local import so PyYAML is only needed if used
+
+        data = self.model_dump()
+        if redact_secrets and data.get("intermetallic"):
+            if data["intermetallic"].get("mp_api_key"):
+                data["intermetallic"]["mp_api_key"] = self.REDACTED_PLACEHOLDER
+        with open(path, "w") as f:
+            yaml.safe_dump(data, f, sort_keys=False, default_flow_style=False)

@@ -16,16 +16,22 @@ analysis or plotting.
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import pandas as pd
 
+from ..core.config import Config
 from ..core.mcts import MCTS
 
 logger = logging.getLogger(__name__)
 
 
-def save_results(mcts: MCTS, output_dir: str, top_n: int = 20) -> Dict[str, str]:
+def save_results(
+    mcts: MCTS,
+    output_dir: str,
+    top_n: int = 20,
+    config: Optional[Config] = None,
+) -> Dict[str, str]:
     """
     Write summary, best-materials, and convergence files to output_dir.
 
@@ -33,6 +39,9 @@ def save_results(mcts: MCTS, output_dir: str, top_n: int = 20) -> Dict[str, str]
         mcts: A completed MCTS run.
         output_dir: Directory to create/write into.
         top_n: How many top materials to record in best_materials.csv.
+        config: The run's Config. When given, it is persisted (secrets redacted)
+            as config.yaml so post-run analysis can read the run's own gamma,
+            beta, and data paths instead of re-specifying them.
 
     Returns:
         Mapping of logical name -> written file path.
@@ -51,6 +60,10 @@ def save_results(mcts: MCTS, output_dir: str, top_n: int = 20) -> Dict[str, str]
     _write_best_materials(mcts, paths["best_materials"], top_n)
     _write_convergence(mcts, paths["convergence"])
     _write_report(mcts, paths["report"], top_n)
+
+    if config is not None:
+        paths["config"] = str(out / "config.yaml")
+        config.dump_yaml(paths["config"])
 
     logger.info("Saved results to %s", out)
     return paths
