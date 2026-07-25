@@ -93,9 +93,44 @@ def test_intermetallic_move_step():
         )
 
 
-def test_intermetallic_ehull_requires_api_key():
+def test_intermetallic_ehull_requires_api_key(monkeypatch):
+    # Ensure the env fallback can't satisfy the requirement for this test.
+    monkeypatch.delenv("MP_API_KEY", raising=False)
     with pytest.raises(ValidationError):
         IntermetallicConfig(structure_path="foo.cif", rollout_method="ehull")
+
+
+def test_mp_api_key_falls_back_to_env(monkeypatch):
+    # With mp_api_key unset in the config, the MP_API_KEY env var supplies it,
+    # so a key-requiring method validates and the key is populated.
+    monkeypatch.setenv("MP_API_KEY", "env_supplied_key")
+    cfg = IntermetallicConfig(
+        structure_path="foo.cif",
+        rollout_method="ehull_rdos_product",
+        doscar_data_path="doscar.csv",
+    )
+    assert cfg.mp_api_key == "env_supplied_key"
+
+
+def test_explicit_mp_api_key_beats_env(monkeypatch):
+    monkeypatch.setenv("MP_API_KEY", "env_key")
+    cfg = IntermetallicConfig(
+        structure_path="foo.cif",
+        rollout_method="ehull_rdos_product",
+        doscar_data_path="doscar.csv",
+        mp_api_key="explicit_key",
+    )
+    assert cfg.mp_api_key == "explicit_key"
+
+
+def test_missing_key_and_env_raises(monkeypatch):
+    monkeypatch.delenv("MP_API_KEY", raising=False)
+    with pytest.raises(ValidationError, match="MP_API_KEY"):
+        IntermetallicConfig(
+            structure_path="foo.cif",
+            rollout_method="ehull_rdos_product",
+            doscar_data_path="doscar.csv",
+        )
 
 
 def test_intermetallic_ehull_rdos_requires_both():
@@ -117,8 +152,9 @@ def test_intermetallic_ehull_rdos_requires_both():
     assert cfg.gamma == 0.0001
 
 
-def test_intermetallic_ehull_rdos_product_requires_both():
+def test_intermetallic_ehull_rdos_product_requires_both(monkeypatch):
     # ehull_rdos_product needs BOTH mp_api_key and doscar_data_path.
+    monkeypatch.delenv("MP_API_KEY", raising=False)  # don't let env supply the key
     with pytest.raises(ValidationError):
         IntermetallicConfig(
             structure_path="foo.cif",

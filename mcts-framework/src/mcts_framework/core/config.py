@@ -14,6 +14,7 @@ fails fast with a clear message instead of deep in the search.
 """
 
 import json
+import os
 from typing import Any, ClassVar, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
@@ -134,7 +135,12 @@ class IntermetallicConfig(BaseModel):
         "ehull_reward * r_DOS and ignores gamma)",
     )
 
-    mp_api_key: Optional[str] = Field(None, description="Materials Project API key")
+    mp_api_key: Optional[str] = Field(
+        None,
+        description="Materials Project API key. If left unset, falls back to "
+        "the MP_API_KEY environment variable (keeps the key out of shared "
+        "config files).",
+    )
     doscar_data_path: Optional[str] = Field(
         None, description="Path to DOSCAR peaks CSV (required for rdos/ehull_rdos)"
     )
@@ -150,12 +156,21 @@ class IntermetallicConfig(BaseModel):
 
     @model_validator(mode="after")
     def _check_reward_requirements(self) -> "IntermetallicConfig":
+        # Fall back to the MP_API_KEY environment variable when the config
+        # leaves mp_api_key unset, so the key can stay out of the (shareable)
+        # YAML. An explicit value in the config still takes precedence.
+        if not self.mp_api_key:
+            env_key = os.environ.get("MP_API_KEY")
+            if env_key:
+                self.mp_api_key = env_key
+
         needs_key = self.rollout_method in (
             "ehull", "ehull_rdos", "ehull_rdos_product"
         )
         if needs_key and not self.mp_api_key:
             raise ValueError(
-                f"rollout_method={self.rollout_method!r} requires mp_api_key"
+                f"rollout_method={self.rollout_method!r} requires an MP API key: "
+                f"set mp_api_key in the config or export MP_API_KEY"
             )
         needs_doscar = self.rollout_method in (
             "rdos", "ehull_rdos", "ehull_rdos_product"
