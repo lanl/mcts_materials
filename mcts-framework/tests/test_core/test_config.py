@@ -331,3 +331,51 @@ def test_config_from_yaml(tmp_path):
     cfg = Config.from_yaml(str(p))
     assert cfg.mcts.selection_mode == "puct"
     assert cfg.intermetallic.f_block_mode == "lanthanides_u_no_wrap"
+
+
+# --- dump_yaml: prune mode-irrelevant selection params -------------------
+
+
+def _dump_and_load_mcts(tmp_path, mode):
+    yaml = pytest.importorskip("yaml")
+    cfg = Config(
+        material_type="intermetallic",
+        mcts={"selection_mode": mode},
+        intermetallic={
+            "structure_path": "foo.cif",
+            "rollout_method": "rdos",
+            "doscar_data_path": "d.csv",
+        },
+    )
+    p = tmp_path / "config.yaml"
+    cfg.dump_yaml(str(p))
+    return yaml.safe_load(p.read_text())["mcts"], p
+
+
+@pytest.mark.parametrize("mode", ["ucb1", "puct"])
+def test_dump_omits_unused_selection_params(tmp_path, mode):
+    # ucb1 / puct consume neither epsilon nor temperature.
+    mcts, _ = _dump_and_load_mcts(tmp_path, mode)
+    assert "epsilon" not in mcts
+    assert "temperature" not in mcts
+    # exploration_constant IS used by these modes, so it stays.
+    assert "exploration_constant" in mcts
+
+
+def test_dump_keeps_epsilon_only_for_epsilon_greedy(tmp_path):
+    mcts, _ = _dump_and_load_mcts(tmp_path, "epsilon_greedy")
+    assert "epsilon" in mcts
+    assert "temperature" not in mcts
+
+
+def test_dump_keeps_temperature_only_for_boltzmann(tmp_path):
+    mcts, _ = _dump_and_load_mcts(tmp_path, "boltzmann")
+    assert "temperature" in mcts
+    assert "epsilon" not in mcts
+
+
+def test_pruned_config_still_reloads(tmp_path):
+    # Pruned keys fall back to their (unused) defaults, so the file round-trips.
+    _, p = _dump_and_load_mcts(tmp_path, "ucb1")
+    reloaded = Config.from_yaml(str(p))
+    assert reloaded.mcts.selection_mode == "ucb1"

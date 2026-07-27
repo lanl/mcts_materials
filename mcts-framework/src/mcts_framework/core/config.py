@@ -269,6 +269,13 @@ class Config(BaseModel):
     #: Placeholder written in place of a real secret when redacting.
     REDACTED_PLACEHOLDER: ClassVar[str] = "<redacted>"
 
+    # Selection params that are only consumed under a specific selection_mode,
+    # so the persisted config records only what the run actually used.
+    _MODE_SPECIFIC_SELECTION_PARAMS: ClassVar[Dict[str, str]] = {
+        "epsilon": "epsilon_greedy",
+        "temperature": "boltzmann",
+    }
+
     def dump_yaml(self, path: str, redact_secrets: bool = True) -> None:
         """
         Write this config to a YAML file next to a run's results.
@@ -281,6 +288,10 @@ class Config(BaseModel):
         redacted file still passes validation on reload via from_yaml - some
         rollout methods require a non-empty key - though it obviously cannot run
         a live energy calculation until a real key is restored.
+
+        Selection knobs that the active selection_mode does not consume (e.g.
+        temperature under ucb1, epsilon unless epsilon_greedy) are omitted, so
+        the recorded config reflects only the settings the run actually used.
         """
         import yaml  # local import so PyYAML is only needed if used
 
@@ -288,5 +299,13 @@ class Config(BaseModel):
         if redact_secrets and data.get("intermetallic"):
             if data["intermetallic"].get("mp_api_key"):
                 data["intermetallic"]["mp_api_key"] = self.REDACTED_PLACEHOLDER
+
+        mcts = data.get("mcts")
+        if mcts:
+            mode = mcts.get("selection_mode")
+            for param, owning_mode in self._MODE_SPECIFIC_SELECTION_PARAMS.items():
+                if mode != owning_mode:
+                    mcts.pop(param, None)
+
         with open(path, "w") as f:
             yaml.safe_dump(data, f, sort_keys=False, default_flow_style=False)
