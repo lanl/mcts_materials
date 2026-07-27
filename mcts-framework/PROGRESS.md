@@ -84,7 +84,7 @@ Porting notes / gaps to bridge when we resume:
   `MCTS.reward_history` (already persisted as `convergence.csv`).
 - Likely shape: a `postprocessing/sweeps.py` that runs a grid of configs
   (varying one field), collects each run's `convergence.csv`/`summary.json`,
-  and emits the overlay/senstivity plots — plus an `mcts-run sweep` command or
+  and emits the overlay/sensitivity plots — plus an `mcts-run sweep` command or
   a thin driver. Decide grid-runner vs. read-existing-runs when we resume.
 - `search_mode` interacts with #4/#6: use `thorough` for coverage-sensitive
   sweeps so the root-convergence early stop doesn't cap breadth (see the

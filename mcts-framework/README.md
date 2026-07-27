@@ -53,22 +53,44 @@ selection → expansion → simulation → backpropagation loop. See
 
 ## Installation
 
+Pick whichever environment manager you prefer. The optional-dependency groups
+are the same either way:
+
+| Extra | Pulls in | Needed for |
+| --- | --- | --- |
+| _(none)_ | numpy, pandas, pydantic, pyyaml, tqdm, typer | core + `rdos`-only runs + tests |
+| `intermetallic` | ASE, spglib, MACE, pymatgen, matbench-discovery | `ehull*` rollout methods |
+| `molecule` | RDKit (+ molecule-modifier, installed separately) | molecule search |
+| `viz` | matplotlib, seaborn, networkx | plots + `mcts-run figures` |
+| `dev` | pytest, ruff, black, mypy | running the test suite |
+| `all` | everything above | — |
+
+### Option 1 — pip
+
 ```bash
-# Core only (numpy, pandas, pydantic, pyyaml, tqdm)
-pip install -e .
-
-# With intermetallic support (ASE, spglib, MACE, pymatgen, matbench-discovery)
-pip install -e ".[intermetallic]"
-
-# With molecule support (RDKit; plus the molecule-modifier package separately)
-pip install -e ".[molecule]"
-
-# With visualization (matplotlib, seaborn, networkx)
-pip install -e ".[viz]"
-
-# Everything + dev tools
-pip install -e ".[all]"
+pip install -e .                      # core only
+pip install -e ".[intermetallic]"     # + intermetallic support
+pip install -e ".[molecule]"          # + molecule support
+pip install -e ".[viz]"               # + visualization
+pip install -e ".[all]"               # everything + dev tools
 ```
+
+### Option 2 — uv
+
+[uv](https://docs.astral.sh/uv/) creates a project-local `.venv` from this
+`pyproject.toml`, independent of conda. `uv sync` also writes a reproducible
+`uv.lock`.
+
+```bash
+uv sync --python 3.11 --extra intermetallic --extra viz --extra dev
+# or everything:
+uv sync --python 3.11 --extra all
+```
+
+With uv, prefix the commands below with `uv run` (e.g. `uv run mcts-run …`,
+`uv run pytest`) — no manual environment activation needed. The rest of this
+README shows the bare commands; they assume an activated env (pip) or an
+implicit `uv run` prefix (uv).
 
 ## Usage
 
@@ -220,8 +242,13 @@ top-N coverage:
 ## Development
 
 ```bash
+# pip:
 pip install -e ".[dev]"
 pytest                    # run the suite
+
+# uv:
+uv sync --extra dev
+uv run pytest
 ```
 
 **Testing note (molecule integration):** the molecule unit tests mock the
