@@ -3,12 +3,14 @@ E_hull vs weighted-rDOS scatter for post-run analysis.
 
 Plots the full design space (E_hull against r_DOS) as a grey backdrop and
 overlays a run's top-N compounds, so you can see where the search's picks land
-relative to every candidate. The data paths are read from the run's own Config;
-gamma (also from Config) only enters the composite score used to pick the top-N
-overlay, not the axes. The ranking key and any design-space filter are
-pluggable, so nothing here is chemistry-specific. Optional synthesized /
-attempted overlays highlight experimentally-known compounds when a list is
-supplied.
+relative to every candidate. The data paths and reward settings
+(rollout_method / beta / gamma) are read from the run's own Config; the top-N
+overlay is ranked by the SAME reward the run optimized (via score_by_method),
+so it agrees with the run and with the table. Those settings only pick which
+compounds are highlighted, not the axes. The ranking key and any design-space
+filter are pluggable, so nothing here is chemistry-specific. Optional
+synthesized / attempted overlays highlight experimentally-known compounds when
+a list is supplied.
 
 matplotlib is imported lazily so importing this module does not require the
 [viz] extra.
@@ -20,12 +22,10 @@ import re
 from pathlib import Path
 from typing import Callable, Hashable, Optional, Sequence
 
-import numpy as np
 import pandas as pd
 
 from ..core.config import Config
-from ..intermetallic import ehull_reward
-from .design_space import full_formula_key, load_design_space
+from .design_space import full_formula_key, load_design_space, score_by_method
 
 
 def _elem_set(name) -> set:
@@ -67,16 +67,19 @@ def plot_ehull_vs_rdos(
     Scatter E_hull vs r_DOS: full design space (backdrop) + run top-N.
 
     The design-space backdrop comes from the run's MACE cache and DOSCAR peaks
-    (per-compound r_DOS via the full formula). gamma (from the run's Config) is
-    used only to rank the top-N overlay by composite score, not for the axes.
+    (per-compound r_DOS via the full formula). The top-N overlay is ranked by
+    the run's own reward (rollout_method/beta/gamma from Config, via
+    score_by_method), not by the axes.
 
     Args:
-        run_df: the run's compounds DataFrame (a name/formula column; used to
-            pick the top-N overlay by composite score if present, else by the
-            config's gamma-weighted composite).
+        run_df: the run's compounds DataFrame (needs a name/formula column). The
+            top-N overlay is chosen by scoring each named compound with the
+            run's reward method; the r_DOS/e_hull used both for scoring and for
+            plotting come from the design-space backdrop.
         out_path: where to write the .png.
-        config: the run's Config. gamma, cache_path (MACE cache) and
-            doscar_data_path (DOSCAR peaks) are read from config.intermetallic.
+        config: the run's Config. rollout_method, beta, gamma, cache_path (MACE
+            cache) and doscar_data_path (DOSCAR peaks) are read from
+            config.intermetallic.
         top_n: how many of the run's best compounds to overlay.
         key_fn: identifies a compound for matching the overlay against the
             backdrop (default full_formula_key, order-independent composition).
@@ -95,6 +98,8 @@ def plot_ehull_vs_rdos(
     ic = config.intermetallic
     if ic is None:
         raise ValueError("plot_ehull_vs_rdos requires an intermetallic Config section")
+    rollout_method = ic.rollout_method
+    beta = ic.beta
     gamma = ic.gamma
     if ic.cache_path is None or ic.doscar_data_path is None:
         raise ValueError(
@@ -142,17 +147,24 @@ def plot_ehull_vs_rdos(
                    edgecolors="#9467bd", linewidths=0.8, label="Successful synthesis")
 
     # Run top-N overlay, matched to the backdrop by key so element ordering in
-    # the run's formulas doesn't silently drop points.
+    # the run's formulas doesn't silently drop points. Rank by the SAME reward
+    # the run optimized (via score_by_method dispatching on rollout_method), so
+    # the highlighted picks agree with the run and with the table - rather than
+    # a fixed additive composite or a pre-existing score column. r_DOS and
+    # e_hull are taken from the backdrop lookup (same source as the axes).
     df = run_df.copy()
     if "name" not in df.columns:
         df["name"] = df.get("formula", df.get("identifier"))
-    if "composite_score" in df.columns:
-        df = df.sort_values("composite_score", ascending=False)
-    elif "e_above_hull" in df.columns:
-        rdos = df.get("r_DOS", df.get("dos_reward", pd.Series(0.0, index=df.index)))
-        df = df.assign(
-            _score=df["e_above_hull"].apply(ehull_reward) + gamma * rdos.fillna(0.0)
-        ).sort_values("_score", ascending=False)
+
+    def _run_score(name):
+        hit = backdrop.get(key_fn(name))
+        if hit is None:
+            return None
+        r_dos, e_hull = hit  # backdrop stores (x=r_DOS, y=e_hull)
+        return score_by_method(rollout_method, e_hull, r_dos, beta, gamma)
+
+    df["_score"] = df["name"].apply(_run_score)
+    df = df[df["_score"].notna()].sort_values("_score", ascending=False)
     top = df.head(top_n)
     xs, ys = [], []
     for _, row in top.iterrows():
