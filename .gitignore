@@ -1,107 +1,34 @@
-# Local secrets/config - never push real API keys (see config.example.json for the template)
+# Local secrets/config - never commit real API keys
 config.json
 .env
 
-# Python
+# Python build / cache artifacts
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 *.egg-info/
 .ipynb_checkpoints/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# Virtual environments
 .venv/
 
 # OS
 .DS_Store
 
-# Embargoed/large data - document in README, do not commit until public release
+# Embargoed/large data - do not commit until public release
 doscar_peaks_data_with_U.csv
 high_throughput_mace_results.full.csv
 *.tar.gz
 
-# MCTS run outputs (regenerate locally with run_mcts.py)
-mcts_results/
+# MCTS run outputs (regenerate locally with mcts-run)
+mcts_results*/
+results_*/
 *.pkl
-# Per-run generated CSVs and stale local data copies (regenerate via generate_figures.py / run_mcts.py)
-# compounds_filtered.dat lives at analysis/compounds_filtered.dat (tracked); per-study
-# copies are obsolete but caught here in case any tool creates them
-analysis/ehull_rdos_u_only_study/**/*.csv
-analysis/ehull_rdos_u_only_study/**/compounds_filtered.dat
-analysis/ehull_rdos_u_only_study_normalized/**/*.csv
-analysis/ehull_rdos_u_only_study_normalized/**/compounds_filtered.dat
-analysis/ehull_rdos_u_only_study_mean_rollout/**/*.csv
-analysis/ehull_rdos_u_only_study_mean_rollout/**/compounds_filtered.dat
-analysis/ehull_rdos_u_only_study_final/compounds_filtered.dat
-analysis/ehull_rdos_u_only_study_final/**/*.csv
-analysis/ehull_rdos_u_only_study_max_undiscounted/compounds_filtered.dat
-analysis/ehull_rdos_u_only_study_max_undiscounted/**/*.csv
-# Supplementary-run outputs and sidecar files (regenerate via run_mcts.py + generate_figures.py)
-analysis/ehull_rdos_u_only_study/d5_start_run/
-analysis/ehull_rdos_u_only_study/farthest_start_run/
-analysis/ehull_rdos_u_only_study_normalized/d5_start_run/
-analysis/ehull_rdos_u_only_study_mean_rollout/d5_start_run/
-analysis/ehull_rdos_u_only_study_final/d5_start_run/
-analysis/ehull_rdos_u_only_study_max_undiscounted/d5_start_run/
-# Sensitivity-sweep raw data/checkpoints (regenerate via sensitivity_studies/scripts/run_all.sh) -
-# the .png figures generated from these ARE committed, so this excludes by
-# extension rather than ignoring the whole results/ directory (a directory-
-# level ignore can't be selectively un-ignored for files nested inside it).
-sensitivity_studies/results/**/*.csv
-sensitivity_studies/results/**/*.json
-writing
 
-# SI figure generation script and output (regenerate locally)
-writing/draft_v3/generate_ehull_vs_eform.py
-writing/draft_v3/figures/supp/ehull_vs_eform.png
-
-# Older study run directories (run outputs, regenerate locally)
-analysis/ehull_rdos_u_only_study_mean_rollout/
-analysis/ehull_rdos_u_only_study_normalized/
-analysis/ehull_rdos_u_only_study_final/
-
-# Discovery efficiency study — MCTS run output directories
-analysis/discovery_efficiency_study/*_start/
-analysis/discovery_efficiency_study/cu_tm/
-analysis/discovery_efficiency_study/fe_tm/
-analysis/discovery_efficiency_study/mn_tm/
-analysis/discovery_efficiency_study/ti_tm/
-analysis/discovery_efficiency_study/extended_mode/
-analysis/discovery_efficiency_study/run_study.log
-analysis/discovery_efficiency_study/run_study.sh
-analysis/discovery_efficiency_study/run_extended_10.sh
-analysis/discovery_efficiency_study/run_tm_variant.sh
-analysis/discovery_efficiency_study/run_extended_mode.sh
-# move1_seeds run scripts contain hardcoded API key — do not commit
-analysis/discovery_efficiency_study/run_move1_seeds.sh
-analysis/discovery_efficiency_study/run_move1_seeds_parallel.py
-# move1_seeds simulation outputs (regenerate via run_move1_seeds_parallel.py)
-analysis/discovery_efficiency_study/move1_seeds/
-analysis/discovery_efficiency_study/figures/discovery_curve.png
-analysis/discovery_efficiency_study/figures/discovery_curve_compare.png
-analysis/discovery_efficiency_study/figures/discovery_curve_cr.png
-analysis/discovery_efficiency_study/figures/discovery_curve_cu.png
-analysis/discovery_efficiency_study/figures/discovery_curve_fe.png
-analysis/discovery_efficiency_study/figures/discovery_curve_edit_distance.png
-analysis/discovery_efficiency_study/tables/top15_best_run.tex
-analysis/ehull_rdos_u_only_study_max_undiscounted/figures/u_only_discovery_curve.png
-analysis/ehull_rdos_u_only_study_max_undiscounted/generate_u_discovery_figure.py
-analysis/ehull_rdos_u_only_study_max_undiscounted/sweep_starting_material_step2.py
-# Root-level figure copy (tracked version lives in figures/ subdir)
-analysis/ehull_rdos_u_only_study_max_undiscounted/ehull_vs_rdos.png
-
-# Misc scripts not part of main workflow
-dos_only_study.py
-
-analysis/ehull_rdos_lanthanide_u_study_max_undiscounted/**/*.csv
-analysis/ehull_rdos_lanthanide_u_study_max_undiscounted/*.csv
-
-# La backfill scripts and results (abandoned — La excluded from design space)
-analysis/backfill_la_compounds.py
-analysis/merge_la_backfill.py
-analysis/la_backfill_results.csv
-
-# Eu start step3 run script (Yb_start_step3 is the canonical run)
-analysis/ehull_rdos_lanthanide_u_study_max_undiscounted/run_eu_start_step3.sh
-
-# Discovery efficiency figures (regenerate via generate_figures.py)
-analysis/discovery_efficiency_study/figures/
+# Kept-aside reference material: sensitivity-sweep raw data/checkpoints
+reference/sensitivity_studies/results/**/*.csv
+reference/sensitivity_studies/results/**/*.json

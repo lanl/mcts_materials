@@ -18,8 +18,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      # Lightweight install only - no mace-torch/pymatgen/matbench-discovery.
-      # The test suite mocks MACE/Materials Project calls, so they aren't needed here.
+      # Lightweight install only - no mace-torch/pymatgen/matbench-discovery/rdkit.
+      # The suite mocks MACE/Materials Project calls; tests needing optional deps
+      # or example data files skip cleanly, so the core install suffices here.
       - name: Install package (core + dev)
         run: pip install -e ".[dev]"
 

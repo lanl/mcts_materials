@@ -19,9 +19,15 @@ regardless.
 
 ## Current status
 
-Test suite: **203 passed, 2 skipped** (`pytest` from the `mcts-framework/` dir).
-The 2 skips are RDKit-dependent molecule tests (RDKit not installed in the
-current env — see caveats).
+Test suite: **231 passed** (`pytest` from the repo root). Skips only when
+optional deps (RDKit) or example data files are absent; with `[all]` installed
+the full suite runs.
+
+**Layout note:** `mcts-framework/` was promoted to the repo root — the package
+now lives at `src/mcts_framework/`, tests at `tests/`, examples at `examples/`,
+and the old `mcts_crystal` package + analysis/sensitivity scripts were deleted
+(`sensitivity_studies/` kept aside under `reference/`). References below to a
+`mcts-framework/` subdirectory are historical.
 
 ### Postprocessing subpackage (done this session)
 
