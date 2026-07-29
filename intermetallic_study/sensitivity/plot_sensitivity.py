@@ -184,9 +184,8 @@ def generate_sensitivity_figures(sensitivity_dir: Path, output_dir: Path):
 
 def main():
     """Generate all sensitivity figures."""
-    # Assumes script is run from repo root
-    repo_root = Path(__file__).parent.parent.parent
-    sensitivity_dir = repo_root / "intermetallic_study" / "sensitivity"
+    # Script is in sensitivity/ directory
+    sensitivity_dir = Path(__file__).parent
     output_dir = sensitivity_dir / "figures"
 
     print("Generating sensitivity analysis figures...")

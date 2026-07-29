@@ -1,7 +1,11 @@
 # Ignore all results directories (regeneratable)
+*/results/
 results/
 
-# Keep figures directory but ignore PNG files
-figures/*.png
-figures/*.pdf
-figures/*.svg
+# Ignore all log files
+*.log
+
+# Keep figures directory but ignore generated figures
+figures/
+
+monitor_and_plot.sh

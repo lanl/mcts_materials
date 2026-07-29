@@ -10,9 +10,9 @@ mcts:
   rollout_aggregation: max
   search_mode: thorough
   seed: 0
-  output_dir: intermetallic_study/sensitivity/rollout_depth/results/depth_5
+  output_dir: results/depth_5
 intermetallic:
-  structure_path: examples/mat_Pb6U1W6_sg191.cif
+  structure_path: /Users/blaubach/codex/mcts-materials/examples/mat_Pb6U1W6_sg191.cif
   transition_metal: Cr
   group_iv: Sn
   f_block_mode: u_only
@@ -21,7 +21,7 @@ intermetallic:
   rollout_method: ehull_rdos_product
   beta: 1.0
   gamma: 1.0
-  doscar_data_path: doscar_peaks_data_with_U.csv
-  cache_path: high_throughput_mace_results.full.csv
+  doscar_data_path: /Users/blaubach/codex/mcts-materials/doscar_peaks_data_with_U.csv
+  cache_path: /Users/blaubach/codex/mcts-materials/high_throughput_mace_results.full.csv
   mp_api_key: <use existing>
 molecule: null
