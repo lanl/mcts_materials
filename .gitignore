@@ -32,3 +32,10 @@ results_*/
 # Kept-aside reference material: sensitivity-sweep raw data/checkpoints
 reference/sensitivity_studies/results/**/*.csv
 reference/sensitivity_studies/results/**/*.json
+
+# Environment variables (contains API keys)
+.env
+
+# Any files with "secret" or "key" in the name
+*secret*
+*key*.txt

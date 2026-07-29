@@ -67,16 +67,42 @@ def build_mcts(config: Config) -> MCTS:
 def _build_intermetallic(config: Config) -> Tuple[object, object, "PropertyEvaluator", "RewardFunction"]:
     """Assemble intermetallic components from config.intermetallic."""
     from ase.io import read
+    from ase.data import atomic_numbers
     from ..intermetallic import (
         IntermetallicStructure,
         PeriodicTableMoves,
         MaceEvaluator,
         DoscarRewardLookup,
         create_intermetallic_reward,
+        elements,
     )
 
     ic = config.intermetallic
     atoms = read(ic.structure_path)
+
+    # Apply composition overrides to the root structure before search starts.
+    # If transition_metal or group_iv are specified, substitute those elements
+    # in the loaded structure so the search starts from the desired composition.
+    if ic.transition_metal or ic.group_iv:
+        target_tm_z = atomic_numbers.get(ic.transition_metal, 0) if ic.transition_metal else 0
+        target_giv_z = atomic_numbers.get(ic.group_iv, 0) if ic.group_iv else 0
+
+        op = []
+        for z in atoms.get_atomic_numbers():
+            z = int(z)
+            # f-block sites: leave unchanged (will be substituted by MCTS)
+            if z in elements.F_BLOCK_ELEMENTS:
+                op.append(0)
+            # Group IV sites: substitute if specified
+            elif z in elements.GROUP_IV_CHAIN:
+                op.append((target_giv_z - z) if target_giv_z else 0)
+            # Metal sites: substitute if specified
+            else:
+                op.append((target_tm_z - z) if target_tm_z else 0)
+
+        atoms = atoms.copy()
+        atoms.set_atomic_numbers(atoms.get_atomic_numbers() + op)
+
     root = IntermetallicStructure(atoms)
 
     moves = PeriodicTableMoves(
