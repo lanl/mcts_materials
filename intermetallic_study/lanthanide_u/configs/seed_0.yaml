@@ -8,14 +8,14 @@
 material_type: intermetallic
 
 mcts:
-  iterations: 2000
+  iterations: 5000
   exploration_constant: 1.41  # √2 for balanced exploration/exploitation
-  termination_limit: 200
+  termination_limit: 500
   selection_mode: ucb1
-  rollout_depth: 5
+  rollout_depth: 4
   n_rollout: 2
   rollout_aggregation: max
-  search_mode: thorough
+  search_mode: fast
   seed: 0
   output_dir: intermetallic_study/lanthanide_u/results/seed_0
 
