@@ -1,0 +1,10 @@
+# Study results and generated files
+*/results/
+*/figures/
+*.log
+
+# Keep configs and scripts under version control
+!*/configs/
+!*.sh
+!*.py
+!*.md

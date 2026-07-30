@@ -1,0 +1,27 @@
+# Sensitivity Study: Starting Material = Ni6Ge6U
+material_type: intermetallic
+mcts:
+  iterations: 1000
+  exploration_constant: 1.41
+  termination_limit: 100
+  selection_mode: ucb1
+  rollout_depth: 3
+  n_rollout: 2
+  rollout_aggregation: max
+  search_mode: thorough
+  seed: 0
+  output_dir: results/ni_ge
+intermetallic:
+  structure_path: /Users/blaubach/codex/mcts-materials/examples/mat_Pb6U1W6_sg191.cif
+  transition_metal: Ni
+  group_iv: Ge
+  f_block_mode: u_only
+  move_step: 1
+  u_bridge: narrow
+  rollout_method: ehull_rdos_product
+  beta: 1.0
+  gamma: 1.0
+  doscar_data_path: /Users/blaubach/codex/mcts-materials/doscar_peaks_data_with_U.csv
+  cache_path: /Users/blaubach/codex/mcts-materials/high_throughput_mace_results.full.csv
+  mp_api_key: <use existing>
+molecule: null

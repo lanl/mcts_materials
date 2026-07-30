@@ -172,6 +172,14 @@ Runnable example scripts:
 - `examples/run_intermetallic.py` — crystal search (rDOS reward; needs `[intermetallic]`)
 - `examples/run_molecule.py` — molecule search (needs `[molecule]` + molecule-modifier)
 
+**Production studies**: The `intermetallic_study/` directory contains complete configurations for:
+- **U-only** and **Lanthanide+U** product-mode studies (5 seeds each, 1000/500 iterations)
+- **Sensitivity analyses** across 4 hyperparameters (starting material, termination limit, rollout depth, move step)
+  - 18 systematic runs varying one parameter while holding others constant
+  - Publication-quality 3"×3" learning curves showing exploration vs. reward trade-offs
+
+See [`intermetallic_study/README.md`](intermetallic_study/README.md) for details.
+
 Migrating from the original `mcts_crystal` code? See [MIGRATION.md](MIGRATION.md).
 
 ## Project structure
@@ -187,7 +195,8 @@ mcts_materials/          # repo root
 │   └── cli/            # `mcts-run` entry point (Typer): main, builders, results
 ├── tests/              # pytest suite (core is dependency-free; material tests skip if deps absent)
 ├── examples/           # Config templates, run_intermetallic.py, run_molecule.py, custom_material.py
-└── reference/          # Kept-aside material (e.g. sensitivity_studies/ for the future sweep harness)
+├── intermetallic_study/  # Production studies: u_only, lanthanide_u, sensitivity analyses
+└── reference/          # Kept-aside material (legacy sensitivity_studies/ for reference)
 ```
 
 ## Design notes

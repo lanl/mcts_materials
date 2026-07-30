@@ -31,6 +31,15 @@ from .driver import (
     load_run_config,
     load_run_dataframe,
 )
+from .product_figures import (
+    plot_ehull_vs_rdos_product_lanthanide_u,
+    plot_ehull_vs_rdos_product_u_only,
+    plot_radial_tree_product,
+)
+from .product_tables import (
+    write_product_mode_table,
+    write_product_mode_txt_table,
+)
 from .radial_tree import plot_radial_tree
 from .scatter import plot_ehull_vs_rdos
 from .tables import write_top_n_table
@@ -41,8 +50,13 @@ __all__ = [
     "load_design_space",
     "rank_design_space",
     "write_top_n_table",
+    "write_product_mode_table",
+    "write_product_mode_txt_table",
     "plot_ehull_vs_rdos",
     "plot_radial_tree",
+    "plot_ehull_vs_rdos_product_u_only",
+    "plot_ehull_vs_rdos_product_lanthanide_u",
+    "plot_radial_tree_product",
     "generate_study_outputs",
     "load_run_config",
     "load_run_dataframe",

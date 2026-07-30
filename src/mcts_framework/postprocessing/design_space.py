@@ -143,9 +143,18 @@ def rank_design_space(
     # rDOS is resolved per-compound from the full formula - identical to the
     # lookup the search uses; no collapsing across f-block substitutions.
     df["r_dos"] = df["name"].apply(doscar_lookup.get_reward)
+
+    # Apply the same data quality penalty that MCTS uses during search:
+    # compounds with no_mp_data or error get e_hull=10.0 (UNSTABLE_PENALTY).
+    # This ensures global ranks match what MCTS was actually optimizing against.
+    df["e_hull_for_ranking"] = df["e_above_hull"].copy()
+    if "data_quality" in df.columns:
+        mask = df["data_quality"].isin(["no_mp_data", "error"])
+        df.loc[mask, "e_hull_for_ranking"] = 10.0
+
     df["score"] = df.apply(
         lambda r: score_by_method(
-            rollout_method, r["e_above_hull"], r["r_dos"], beta, gamma
+            rollout_method, r["e_hull_for_ranking"], r["r_dos"], beta, gamma
         ),
         axis=1,
     )
