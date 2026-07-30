@@ -80,6 +80,11 @@ def _build_intermetallic(config: Config) -> Tuple[object, object, "PropertyEvalu
     ic = config.intermetallic
     atoms = read(ic.structure_path)
 
+    # DEPRECATED: composition override mechanism. Kept for backward compatibility.
+    # Users should now specify the desired starting composition directly in the CIF
+    # file via structure_path. The config validator checks that the CIF's f-block
+    # element(s) are compatible with f_block_mode.
+    #
     # Apply composition overrides to the root structure before search starts.
     # If transition_metal or group_iv are specified, substitute those elements
     # in the loaded structure so the search starts from the desired composition.

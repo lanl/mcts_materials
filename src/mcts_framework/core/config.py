@@ -156,6 +156,9 @@ class IntermetallicConfig(BaseModel):
 
     @model_validator(mode="after")
     def _check_reward_requirements(self) -> "IntermetallicConfig":
+        import warnings
+        from pathlib import Path
+
         # Fall back to the MP_API_KEY environment variable when the config
         # leaves mp_api_key unset, so the key can stay out of the (shareable)
         # YAML. An explicit value in the config still takes precedence.
@@ -179,6 +182,86 @@ class IntermetallicConfig(BaseModel):
             raise ValueError(
                 f"rollout_method={self.rollout_method!r} requires doscar_data_path"
             )
+
+        # Deprecation warning for composition override fields
+        if self.transition_metal or self.group_iv:
+            warnings.warn(
+                "The transition_metal and group_iv fields are deprecated and will be "
+                "removed in a future version. Instead, provide a CIF file with the "
+                "desired starting composition via structure_path.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+
+        # Validate f-block element in starting structure matches f_block_mode
+        # Only check if we're NOT using composition overrides (which apply after this check)
+        # AND if ASE is available (it's an optional dependency)
+        if not (self.transition_metal or self.group_iv):
+            try:
+                from ase.io import read as ase_read
+                from ..intermetallic import elements
+            except ImportError:
+                # ASE not installed - skip validation (this is fine for core tests)
+                # Validation will run when actually building intermetallic configs
+                return self
+
+            try:
+                atoms = ase_read(self.structure_path)
+                f_block_elements_in_cif = set(
+                    z for z in atoms.get_atomic_numbers()
+                    if int(z) in elements.F_BLOCK_ELEMENTS
+                )
+
+                if f_block_elements_in_cif:
+                    # Check compatibility with f_block_mode
+                    if self.f_block_mode == "u_only":
+                        if 92 not in f_block_elements_in_cif:
+                            raise ValueError(
+                                f"f_block_mode='u_only' requires U (atomic number 92) "
+                                f"in the starting structure, but found f-block elements: "
+                                f"{sorted(f_block_elements_in_cif)}"
+                            )
+                        if len(f_block_elements_in_cif) > 1:
+                            warnings.warn(
+                                f"f_block_mode='u_only' found multiple f-block elements "
+                                f"{sorted(f_block_elements_in_cif)} in starting structure. "
+                                f"Only U (92) will participate in moves.",
+                                UserWarning
+                            )
+                    elif self.f_block_mode in ("lanthanides_u", "lanthanides_u_no_wrap"):
+                        # Lanthanides are 57-71 (La-Lu), U is 92
+                        lanthanides = set(range(57, 72))
+                        valid_elements = lanthanides | {92}
+                        invalid = f_block_elements_in_cif - valid_elements
+                        if invalid:
+                            raise ValueError(
+                                f"f_block_mode='{self.f_block_mode}' requires lanthanides "
+                                f"(La-Lu, 57-71) or U (92), but found: {sorted(invalid)}"
+                            )
+                    elif self.f_block_mode == "full_f_block":
+                        # All f-block elements are valid
+                        pass
+                else:
+                    # No f-block elements in CIF - warn but allow (for testing)
+                    warnings.warn(
+                        f"No f-block elements found in starting structure "
+                        f"{self.structure_path}. The search will not explore f-block "
+                        f"substitutions.",
+                        UserWarning
+                    )
+            except FileNotFoundError:
+                # Structure file doesn't exist yet - skip validation
+                # (This can happen during config construction before files are in place)
+                pass
+        else:
+            # Using deprecated composition overrides - warn about template CIF assumption
+            warnings.warn(
+                "Using transition_metal/group_iv overrides without specifying a custom "
+                "CIF file. The substitutions will be applied to the default Pb₆U₁W₆ "
+                "structure template from the structure_path.",
+                UserWarning
+            )
+
         return self
 
 
