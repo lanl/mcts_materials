@@ -1,6 +1,6 @@
 # MCTS Product-Mode Studies
 
-This directory contains the configuration and scripts for running two product-mode MCTS studies that replicate the original `mcts_crystal` analyses with the new `mcts_framework` implementation.
+This directory contains configurations and scripts for running MCTS studies on intermetallic compounds, including both production runs and systematic hyperparameter sensitivity analyses.
 
 ## Studies
 
@@ -37,10 +37,31 @@ This directory contains the configuration and scripts for running two product-mo
 - `rollout_aggregation`: max
 - `termination_limit`: 25
 
+### 3. Sensitivity Study (`sensitivity/`)
+
+**Objective**: Systematic hyperparameter sweeps to understand MCTS performance on the U-only design space
+
+**Four sensitivity dimensions**:
+1. **Starting Material** (5 compositions): Cr₆Sn₆U, Fe₆Sn₆U, Cu₆Sn₆U, Ni₆Ge₆U, W₆Pb₆U
+2. **Termination Limit** (5 values): 25, 50, 100, 200, 500 visits without improvement
+3. **Rollout Depth** (4 values): 1, 2, 3, 5 random moves per rollout
+4. **Move Step** (4 values): 1, 2, 3, 5 periodic table jumps
+
+**Design space**: 108 U-only compounds  
+**Iterations**: 1,000 per run  
+**Baseline parameters**: exploration_constant=1.41, termination_limit=100, rollout_depth=3, move_step=1
+
+Each study varies one parameter while holding others at baseline. Results include:
+- Learning curves: unique compounds explored vs. best reward found
+- 3"×3" publication-quality figures (300 DPI)
+- Full YAML configs for exact replication
+
+See [`sensitivity/README.md`](sensitivity/README.md) for details.
+
 ## Directory Structure
 
 ```
-study/
+intermetallic_study/
 ├── u_only/
 │   ├── configs/          # YAML configs for seeds 0-4
 │   ├── results/          # Output directories for each seed
@@ -53,6 +74,23 @@ study/
 │   ├── figures/
 │   ├── run_all_seeds.sh
 │   └── generate_figures.py
+├── sensitivity/
+│   ├── starting_material/
+│   │   ├── configs/      # 5 YAML configs (cr_sn, fe_sn, cu_sn, ni_ge, w_pb)
+│   │   └── run_all.sh    # Run all 5 configs
+│   ├── termination_limit/
+│   │   ├── configs/      # 5 YAML configs (25, 50, 100, 200, 500)
+│   │   └── run_all.sh
+│   ├── rollout_depth/
+│   │   ├── configs/      # 4 YAML configs (1, 2, 3, 5)
+│   │   └── run_all.sh
+│   ├── move_step/
+│   │   ├── configs/      # 4 YAML configs (1, 2, 3, 5)
+│   │   └── run_all.sh
+│   ├── figures/          # 4 sensitivity plots (3"×3" each)
+│   ├── plot_sensitivity.py  # Generate all 4 figures
+│   ├── .gitignore        # Exclude results/, logs, figures/
+│   └── README.md         # Detailed sensitivity study documentation
 └── README.md             # This file
 ```
 
@@ -104,6 +142,36 @@ bash run_all_seeds.sh
 # Generate figures
 python generate_figures.py
 ```
+
+### Running Sensitivity Studies
+
+```bash
+cd sensitivity
+
+# Run all 18 sensitivity runs (4 studies × 4-5 configs each)
+# Option 1: Run all studies in parallel (recommended, takes ~30-45 minutes)
+cd starting_material && ./run_all.sh &
+cd ../termination_limit && ./run_all.sh &
+cd ../rollout_depth && ./run_all.sh &
+cd ../move_step && ./run_all.sh &
+wait
+
+# Option 2: Run individual studies sequentially
+cd starting_material && ./run_all.sh
+cd ../termination_limit && ./run_all.sh
+cd ../rollout_depth && ./run_all.sh
+cd ../move_step && ./run_all.sh
+
+# Generate all 4 sensitivity figures after runs complete
+cd ..
+python3 plot_sensitivity.py
+```
+
+Results appear in `sensitivity/figures/`:
+- `starting_material_sensitivity.png`
+- `termination_limit_sensitivity.png`
+- `rollout_depth_sensitivity.png`
+- `move_step_sensitivity.png`
 
 ## Output Files
 
