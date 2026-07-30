@@ -195,9 +195,15 @@ class IntermetallicConfig(BaseModel):
 
         # Validate f-block element in starting structure matches f_block_mode
         # Only check if we're NOT using composition overrides (which apply after this check)
+        # AND if ASE is available (it's an optional dependency)
         if not (self.transition_metal or self.group_iv):
-            from ase.io import read as ase_read
-            from ..intermetallic import elements
+            try:
+                from ase.io import read as ase_read
+                from ..intermetallic import elements
+            except ImportError:
+                # ASE not installed - skip validation (this is fine for core tests)
+                # Validation will run when actually building intermetallic configs
+                return self
 
             try:
                 atoms = ase_read(self.structure_path)
