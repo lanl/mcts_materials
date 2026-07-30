@@ -23,49 +23,18 @@ def load_trajectory(result_dir: Path) -> Tuple[List[int], List[float]]:
     Returns:
         (unique_compounds, best_rewards) where each list element is cumulative count/best
     """
-    report_path = result_dir / "report.txt"
-    if not report_path.exists():
+    import pandas as pd
+
+    # Load trajectory from convergence.csv
+    convergence_path = result_dir / "convergence.csv"
+    if not convergence_path.exists():
         return [], []
 
-    # Parse report.txt for unique materials explored
-    with open(report_path) as f:
-        lines = f.readlines()
+    df = pd.read_csv(convergence_path)
 
-    n_unique = None
-    for line in lines:
-        if "unique materials explored" in line.lower():
-            # Format: "1,234 unique materials explored"
-            n_unique = int(line.split()[0].replace(",", ""))
-            break
-
-    # Load trajectory from discoveries.json for reward progression
-    discoveries_path = result_dir / "discoveries.json"
-    if not discoveries_path.exists():
-        return [n_unique] if n_unique else [], []
-
-    with open(discoveries_path) as f:
-        discoveries = json.load(f)
-
-    # Build cumulative trajectory
-    unique_compounds = []
-    best_rewards = []
-    seen_formulas = set()
-    current_best = -float('inf')
-
-    for disc in discoveries:
-        formula = disc.get("formula", "")
-        reward = disc.get("reward", 0.0)
-
-        # Track unique compounds
-        if formula and formula not in seen_formulas:
-            seen_formulas.add(formula)
-
-        # Track best reward
-        if reward > current_best:
-            current_best = reward
-
-        unique_compounds.append(len(seen_formulas))
-        best_rewards.append(current_best)
+    # Extract unique_materials and best_reward columns
+    unique_compounds = df['unique_materials'].tolist()
+    best_rewards = df['best_reward'].tolist()
 
     return unique_compounds, best_rewards
 
@@ -99,9 +68,8 @@ def plot_sensitivity_panel(
 
     ax.set_xlabel("Unique Compounds Explored", fontsize=9)
     ax.set_ylabel("Best Reward Found", fontsize=9)
-    ax.set_title(title, fontsize=10, fontweight='bold')
-    ax.legend(fontsize=7, loc='best', framealpha=0.9)
-    ax.grid(True, alpha=0.3, linewidth=0.5)
+    ax.set_xlim(0, 100)
+    ax.legend(fontsize=7, loc='lower right', framealpha=0.9)
     ax.tick_params(labelsize=8)
 
 
@@ -169,7 +137,7 @@ def generate_sensitivity_figures(sensitivity_dir: Path, output_dir: Path):
             data=data,
             param_name=study["name"],
             param_labels=study["labels"],
-            title=study["title"],
+            title="",
         )
 
         plt.tight_layout()
