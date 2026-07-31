@@ -102,6 +102,32 @@ class TestWriteTopNTable:
         with pytest.raises(ValueError, match="cache_path"):
             write_top_n_table(_sample_df(), str(tmp_path / "x.tex"), cfg, n=3)
 
+    def test_rdos_recovered_from_doscar_when_column_absent(self, tmp_path):
+        # Regression: a tree-derived df has no r_DOS/dos_reward column and its
+        # 'name' may be a full 'formula|SG|Wyckoff' identifier. The table must
+        # recover r_DOS from the run's DOSCAR data (splitting on '|'), not treat
+        # it as 0 (which would zero every rDOS-dependent reward). Uses U-only
+        # compounds known to have DOSCAR entries.
+        from mcts_framework.postprocessing import load_design_space
+
+        cfg = _make_config()  # ehull_rdos_product
+        _, lookup = load_design_space(MACE_CACHE, DOSCAR_PEAKS)
+        # A df with NO r_DOS column and identifier-style names.
+        df = pd.DataFrame({
+            "name": ["Cr6Sn6U|SG191|a", "Fe6Ge6U|SG191|b"],
+            "e_above_hull": [0.02, 0.01],
+        })
+        out = write_top_n_table(df, str(tmp_path / "r.tex"), cfg, n=2)
+        body = [ln for ln in Path(out).read_text().splitlines()
+                if "&" in ln and "MCTS Rank" not in ln]
+        # r_DOS column (index 3) must be the real per-compound value, not 0.
+        rdos_cells = [float(ln.split("&")[3]) for ln in body]
+        assert all(v > 0 for v in rdos_cells), f"r_DOS not recovered: {rdos_cells}"
+        # And it must match the DOSCAR lookup on the plain formula.
+        assert rdos_cells[0] == pytest.approx(
+            max(lookup.get_reward("Cr6Sn6U"), lookup.get_reward("Fe6Ge6U")), abs=1e-3
+        )
+
 
 class TestConfigDumpYaml:
     def test_redacts_api_key_and_roundtrips(self, tmp_path):

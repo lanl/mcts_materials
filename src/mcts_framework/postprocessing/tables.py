@@ -18,7 +18,12 @@ import pandas as pd
 
 from ..core.config import Config
 from ..intermetallic import ehull_reward
-from .design_space import full_formula_key, rank_design_space, score_by_method
+from .design_space import (
+    full_formula_key,
+    load_design_space,
+    rank_design_space,
+    score_by_method,
+)
 
 
 def _elem_set(name) -> set:
@@ -110,10 +115,20 @@ def write_top_n_table(
     # Recompute r_DOS, r_ehull, and the run's reward from the config's method so
     # the table always agrees with the run (rather than trusting a pre-existing
     # score column that may have used a different formula).
+    #
+    # r_DOS is recovered self-sufficiently: prefer an existing r_DOS/dos_reward
+    # column, else look it up per-compound from the run's DOSCAR data (the same
+    # lookup the search uses). Without this fallback, calling this function on a
+    # tree-derived df with no r_DOS column would silently score every compound
+    # with r_DOS=0 - zeroing any rDOS-dependent reward. The name may be a full
+    # "formula|SG|Wyckoff" identifier, so the lookup splits on "|".
     if "r_DOS" not in df.columns and "dos_reward" in df.columns:
         df["r_DOS"] = df["dos_reward"]
     if "r_DOS" not in df.columns:
-        df["r_DOS"] = 0.0
+        _, doscar_lookup = load_design_space(mace_cache, doscar_peaks)
+        df["r_DOS"] = df["name"].apply(
+            lambda n: doscar_lookup.get_reward(str(n).split("|")[0])
+        )
     df["ehull_reward"] = df["e_above_hull"].apply(ehull_reward)
     df["reward"] = df.apply(
         lambda r: score_by_method(
