@@ -13,7 +13,6 @@ Usage:
 """
 
 import argparse
-import re
 import sys
 from pathlib import Path
 
@@ -21,10 +20,17 @@ import pandas as pd
 
 from mcts_framework.postprocessing import (
     load_run_config,
-    plot_ehull_vs_rdos_product_u_only,
-    plot_radial_tree_product,
-    write_product_mode_table,
-    write_product_mode_txt_table,
+    plot_ehull_vs_rdos,
+    plot_radial_tree,
+    write_top_n_table,
+)
+
+# Study-specific helpers live alongside the drivers (not in the library).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _study_figures import (  # noqa: E402
+    SYNTHESIZED_COMPOUNDS,
+    u_only_filter,
+    write_txt_table,
 )
 
 
@@ -73,17 +79,6 @@ def main():
         / "compounds_filtered.dat"
     )
 
-    # Optional: table for rank labels
-    table_path = (
-        repo_root
-        / "mcts_materials"
-        / "analysis"
-        / "ehull_rdos_u_only_study_max_undiscounted"
-        / "product_mode"
-        / "tables"
-        / "top15_u_only_product.tex"
-    )
-
     print("=" * 60)
     print("U-Only Study Figure Generation")
     print("=" * 60)
@@ -126,12 +121,15 @@ def main():
     print("Generating ehull_vs_rdos_product.png...")
     scatter_path = figures_dir / "ehull_vs_rdos_product.png"
     try:
-        plot_ehull_vs_rdos_product_u_only(
+        plot_ehull_vs_rdos(
+            run_df=results_df,
             out_path=str(scatter_path),
             config=config,
             top_n=args.top_n,
+            space_filter=u_only_filter,
+            synthesized=SYNTHESIZED_COMPOUNDS,
             attempted_path=str(attempted_path) if attempted_path.exists() else None,
-            run_df=results_df,
+            ymax=1.5,
         )
     except Exception as e:
         print(f"ERROR generating scatter plot: {e}")
@@ -152,12 +150,12 @@ def main():
         print("Skipping radial tree generation.")
     else:
         try:
-            plot_radial_tree_product(
+            plot_radial_tree(
                 tree_path=str(tree_path),
                 out_path=str(radial_path),
                 config=config,
-                table_path=str(table_path) if table_path.exists() else None,
                 max_nodes=60,
+                top_n=args.top_n,
             )
         except Exception as e:
             print(f"ERROR generating radial tree: {e}")
@@ -167,36 +165,24 @@ def main():
 
     print()
 
-    # Helper function for U-only filter
-    def _u_only_filter(name: str) -> bool:
-        """True if compound contains U but no other f-block elements."""
-        f_block = {
-            'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er',
-            'Tm', 'Yb', 'Lu', 'Th', 'Pa', 'U', 'Np', 'Pu'
-        }
-        elems = set(re.findall(r'[A-Z][a-z]?', str(name)))
-        return 'U' in elems and not (elems & (f_block - {'U'}))
-
     # Generate top-15 tables
     print("Generating top-15 tables...")
     tables_dir = figures_dir / "tables"
     tables_dir.mkdir(exist_ok=True)
 
-    # Synthesized compounds
-    synthesized = ['U-Sn-V', 'U-Sn-Nb', 'U-Ge-Cr', 'U-Ge-Co']
-
-    # LaTeX table
+    # LaTeX table (generic library, LaTeX subscript names, U-only design space).
     tex_path = tables_dir / "top15_u_only_product.tex"
     try:
-        write_product_mode_table(
+        write_top_n_table(
             df=results_df,
             out_path=str(tex_path),
             config=config,
             n=15,
-            synthesized=synthesized,
+            synthesized=SYNTHESIZED_COMPOUNDS,
             attempted_path=str(attempted_path) if attempted_path.exists() else None,
             study_label="U-only",
-            space_filter=_u_only_filter,
+            space_filter=u_only_filter,
+            latex_names=True,
         )
         print(f"  Saved: {tex_path.name}")
     except Exception as e:
@@ -204,18 +190,16 @@ def main():
         import traceback
         traceback.print_exc()
 
-    # Plain text table
+    # Plain text table (study-local helper).
     txt_path = study_dir / "top15_recommendations.txt"
     try:
-        write_product_mode_txt_table(
+        write_txt_table(
             df=results_df,
             out_path=str(txt_path),
             config=config,
             n=15,
-            synthesized=synthesized,
-            attempted_path=str(attempted_path) if attempted_path.exists() else None,
             study_label="U-only",
-            space_filter=_u_only_filter,
+            space_filter=u_only_filter,
         )
         print(f"  Saved: {txt_path.name}")
     except Exception as e:
