@@ -58,6 +58,25 @@ class TestPlotEhullVsRdos:
         assert fig is not None
         assert Path(out).exists() and Path(out).stat().st_size > 0
 
+    def test_publication_styling_defaults(self, tmp_path):
+        fig = plot_ehull_vs_rdos(_run_df(), str(tmp_path / "s.png"),
+                                 _make_config(), top_n=3)
+        ax = fig.axes[0]
+        # 3x3 figure, top/right spines hidden (publication default).
+        assert tuple(fig.get_size_inches()) == (3.0, 3.0)
+        assert not ax.spines["top"].get_visible()
+        assert not ax.spines["right"].get_visible()
+
+    def test_ymax_caps_axis_else_shows_outliers(self, tmp_path):
+        # Default: full range shows the E_hull~10 penalty outliers.
+        full = plot_ehull_vs_rdos(_run_df(), str(tmp_path / "full.png"),
+                                  _make_config(), top_n=3)
+        assert full.axes[0].get_ylim()[1] > 5  # autoscaled above the outlier
+        # ymax caps the view for the tight publication look.
+        capped = plot_ehull_vs_rdos(_run_df(), str(tmp_path / "cap.png"),
+                                    _make_config(), top_n=3, ymax=1.5)
+        assert capped.axes[0].get_ylim()[1] == 1.5
+
     def test_overlay_has_topn_points(self, tmp_path):
         fig = plot_ehull_vs_rdos(_run_df(), str(tmp_path / "s.png"),
                                  _make_config(), top_n=3)
