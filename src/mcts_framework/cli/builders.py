@@ -108,6 +108,16 @@ def _build_intermetallic(config: Config) -> Tuple[object, object, "PropertyEvalu
         atoms = atoms.copy()
         atoms.set_atomic_numbers(atoms.get_atomic_numbers() + op)
 
+    # Validate the (final) starting composition against f_block_mode, now that
+    # the CIF is loaded. Done here rather than in config validation so the check
+    # runs on the atoms we already have - no extra file I/O, no ASE dependency in
+    # the config layer. Raises on a hard incompatibility (e.g. u_only without U);
+    # softer issues are surfaced as warnings.
+    import warnings
+
+    for msg in elements.validate_fblock_compat(atoms.get_atomic_numbers(), ic.f_block_mode):
+        warnings.warn(msg, UserWarning)
+
     root = IntermetallicStructure(atoms)
 
     moves = PeriodicTableMoves(
