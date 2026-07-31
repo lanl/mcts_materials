@@ -35,7 +35,7 @@ from .structure import IntermetallicStructure
 logger = logging.getLogger(__name__)
 
 # Penalty e_above_hull (eV/atom) for compounds with missing/invalid MP data.
-_UNSTABLE_PENALTY = 10.0
+UnstablePenalty = 10.0
 
 _CACHE_COLUMNS = ["name", "e_form", "e_above_hull", "e_decomp", "data_quality"]
 
@@ -136,7 +136,7 @@ class MaceEvaluator(PropertyEvaluator):
 
             e_decomp, data_quality = self._get_decomposition_energy(atoms_copy)
             if data_quality in ("no_mp_data", "error"):
-                e_hull = _UNSTABLE_PENALTY
+                e_hull = UnstablePenalty
             else:
                 e_hull = e_form - e_decomp
 
@@ -146,8 +146,8 @@ class MaceEvaluator(PropertyEvaluator):
 
         except Exception as exc:  # pragma: no cover - live-calc failure path
             logger.error("Error computing energies for %s: %s", formula, exc)
-            self._cache_result(formula, 0.0, _UNSTABLE_PENALTY, 0.0, "error")
-            return 0.0, _UNSTABLE_PENALTY, formula
+            self._cache_result(formula, 0.0, UnstablePenalty, 0.0, "error")
+            return 0.0, UnstablePenalty, formula
 
     # --- MACE calculator management --------------------------------------
 
@@ -254,7 +254,7 @@ class MaceEvaluator(PropertyEvaluator):
         e_form = float(row["e_form"])
         e_hull = float(row["e_above_hull"])
         if "data_quality" in row and row["data_quality"] in ("no_mp_data", "error"):
-            e_hull = _UNSTABLE_PENALTY
+            e_hull = UnstablePenalty
         return e_form, e_hull
 
     @staticmethod

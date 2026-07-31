@@ -18,7 +18,7 @@ from typing import Callable, Dict, Hashable, Optional, Tuple
 
 import pandas as pd
 
-from ..intermetallic import DoscarRewardLookup, ehull_reward
+from ..intermetallic import DoscarRewardLookup, UnstablePenalty, ehull_reward
 
 
 def full_formula_key(name) -> str:
@@ -145,12 +145,12 @@ def rank_design_space(
     df["r_dos"] = df["name"].apply(doscar_lookup.get_reward)
 
     # Apply the same data quality penalty that MCTS uses during search:
-    # compounds with no_mp_data or error get e_hull=10.0 (UNSTABLE_PENALTY).
-    # This ensures global ranks match what MCTS was actually optimizing against.
+    # compounds with no_mp_data or error get e_hull=UnstablePenalty. This
+    # ensures global ranks match what MCTS was actually optimizing against.
     df["e_hull_for_ranking"] = df["e_above_hull"].copy()
     if "data_quality" in df.columns:
         mask = df["data_quality"].isin(["no_mp_data", "error"])
-        df.loc[mask, "e_hull_for_ranking"] = 10.0
+        df.loc[mask, "e_hull_for_ranking"] = UnstablePenalty
 
     df["score"] = df.apply(
         lambda r: score_by_method(
