@@ -64,14 +64,26 @@ def _write_tree(path):
 
 @requires_doscar
 class TestPlotRadialTree:
-    def test_renders_four_panels_and_stars_root(self, tmp_path):
+    def test_renders_three_panels_and_stars_root(self, tmp_path):
         tree = tmp_path / "tree.json"
         _write_tree(tree)
         out = tmp_path / "radial.png"
         fig = plot_radial_tree(str(tree), str(out), _make_config(), max_nodes=60)
         assert fig is not None
-        assert len(fig.axes) >= 4  # 4 panels (+ colorbar axes)
+        # Three panels: reward (a), r_ehull (b), r_DOS (c). Colorbars are inset
+        # axes on each panel, so fig.axes counts the 3 main panels.
+        assert len(fig.axes) == 3
         assert out.exists() and out.stat().st_size > 0
+
+    def test_output_is_deterministic(self, tmp_path):
+        # The layout sorts nodes by identifier, so repeated renders are pixel-
+        # identical (guards against set-iteration / hash-seed nondeterminism).
+        tree = tmp_path / "tree.json"
+        _write_tree(tree)
+        a, b = tmp_path / "a.png", tmp_path / "b.png"
+        plot_radial_tree(str(tree), str(a), _make_config())
+        plot_radial_tree(str(tree), str(b), _make_config())
+        assert a.read_bytes() == b.read_bytes()
 
     def test_empty_tree_returns_none(self, tmp_path):
         tree = tmp_path / "empty.json"
