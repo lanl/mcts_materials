@@ -379,3 +379,21 @@ def test_pruned_config_still_reloads(tmp_path):
     _, p = _dump_and_load_mcts(tmp_path, "ucb1")
     reloaded = Config.from_yaml(str(p))
     assert reloaded.mcts.selection_mode == "ucb1"
+
+
+def test_intermetallic_config_validation_does_not_import_ase(monkeypatch):
+    # Regression: config validation must stay pure - the f-block/CIF check was
+    # moved to cli.builders, so constructing an IntermetallicConfig (even with a
+    # real structure_path) must NOT read the CIF or import ASE. Build in a fresh
+    # subprocess-like state by asserting 'ase' isn't pulled in by construction.
+    import sys
+
+    monkeypatch.delitem(sys.modules, "ase", raising=False)
+    monkeypatch.delitem(sys.modules, "ase.io", raising=False)
+    IntermetallicConfig(
+        structure_path="examples/mat_Pb6U1W6_sg191.cif",  # exists, but must not be read
+        rollout_method="rdos",
+        doscar_data_path="d.csv",
+        f_block_mode="u_only",
+    )
+    assert "ase" not in sys.modules and "ase.io" not in sys.modules
