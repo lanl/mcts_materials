@@ -59,6 +59,7 @@ class MaceEvaluator(PropertyEvaluator):
         self.cache_path = cache_path
         self.mp_api_key = mp_api_key
         self.last_e_decomp = 0.0
+        self._warned_no_api_key = False
 
         # MACE calculators are stateful; keep one per thread.
         self._thread_local = threading.local()
@@ -137,6 +138,18 @@ class MaceEvaluator(PropertyEvaluator):
             e_decomp, data_quality = self._get_decomposition_energy(atoms_copy)
             if data_quality in ("no_mp_data", "error"):
                 e_hull = UnstablePenalty
+            elif data_quality == "no_api_key":
+                # No MP key -> no convex hull. E_hull falls back to the
+                # formation energy, so ranking is by formation energy only.
+                # Warn once (a search evaluates thousands of compounds).
+                if not self._warned_no_api_key:
+                    logger.warning(
+                        "No Materials Project API key: e_above_hull cannot be "
+                        "computed (no convex hull). Falling back to E_hull = "
+                        "e_form; ranking is by FORMATION ENERGY only."
+                    )
+                    self._warned_no_api_key = True
+                e_hull = e_form
             else:
                 e_hull = e_form - e_decomp
 
@@ -175,9 +188,13 @@ class MaceEvaluator(PropertyEvaluator):
     # --- Materials Project decomposition energy --------------------------
 
     def _get_decomposition_energy(self, atoms) -> Tuple[float, str]:
-        """Compute e_decomp via MP phase diagram; returns (e_decomp, quality)."""
+        """Compute e_decomp via MP phase diagram; returns (e_decomp, quality).
+
+        With no MP API key the convex hull cannot be built, so e_decomp is
+        undefined (NaN).
+        """
         if not self.mp_api_key:
-            return 0.0, "no_api_key"
+            return float("nan"), "no_api_key"
 
         chemical_formula = atoms.get_chemical_formula()
         element_set = set(atoms.get_chemical_symbols())
