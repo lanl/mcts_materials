@@ -44,46 +44,6 @@ def _load_attempted_sets(attempted_path: Optional[str]) -> List[set]:
         return []
 
 
-def _latex_formula(name: str) -> str:
-    """
-    Convert compound name to LaTeX format with subscripts.
-
-    Examples:
-        Sn6Ti6U -> UTi$_{6}$Sn$_{6}$
-        Mn6Sn6U -> UMn$_{6}$Sn$_{6}$
-    """
-    # Extract formula from full identifier if needed
-    formula = name.split("|")[0] if "|" in name else name
-
-    # Parse element-count pairs
-    matches = re.findall(r'([A-Z][a-z]?)(\d*)', formula)
-
-    # Group by element
-    elem_counts = {}
-    for elem, count in matches:
-        if not elem:
-            continue
-        count = int(count) if count else 1
-        elem_counts[elem] = elem_counts.get(elem, 0) + count
-
-    # Order: U first, then alphabetically
-    sorted_elems = []
-    if 'U' in elem_counts:
-        sorted_elems.append(('U', elem_counts['U']))
-        del elem_counts['U']
-    sorted_elems.extend(sorted(elem_counts.items()))
-
-    # Build LaTeX string
-    parts = []
-    for elem, count in sorted_elems:
-        if count == 1:
-            parts.append(elem)
-        else:
-            parts.append(f"{elem}$_{{{count}}}$")
-
-    return "".join(parts)
-
-
 def write_product_mode_table(
     df: pd.DataFrame,
     out_path: str,
@@ -96,108 +56,21 @@ def write_product_mode_table(
     space_filter: Optional[Callable[[str], bool]] = None,
 ) -> str:
     """
-    Write top-N product-mode table in LaTeX format (.tex).
+    DEPRECATED thin shim over the generic write_top_n_table (latex_names=True).
 
-    Similar to write_top_n_table but with product-mode specific formatting.
+    The unified generic table now carries the LaTeX-subscript formatting, the
+    E_hull/r_ehull/r_DOS/Reward column order, and the '--' unsynthesized marker
+    that used to live here, so this just forwards. Kept temporarily so the study
+    drivers keep importing it; scheduled for removal when the drivers are
+    rewritten to call write_top_n_table directly.
     """
-    ic = config.intermetallic
-    if ic is None:
-        raise ValueError("write_product_mode_table requires intermetallic Config")
+    from .tables import write_top_n_table
 
-    rollout_method = ic.rollout_method
-    gamma = ic.gamma
-    beta = ic.beta
-    mace_cache = ic.cache_path
-    doscar_peaks = ic.doscar_data_path
-
-    if mace_cache is None or doscar_peaks is None:
-        raise ValueError("config.intermetallic must set cache_path and doscar_data_path")
-
-    df = df.copy()
-    if "name" not in df.columns:
-        df["name"] = df.get("formula", df.get("identifier"))
-
-    # Load design space to get r_DOS values
-    from .design_space import load_design_space
-    _, doscar_lookup = load_design_space(mace_cache, doscar_peaks)
-
-    # Compute r_DOS from doscar lookup if not present
-    if "r_DOS" not in df.columns:
-        def get_rdos(name):
-            # Extract formula from full identifier
-            formula = name.split("|")[0] if "|" in name else name
-            return doscar_lookup.get_reward(formula)
-        df["r_DOS"] = df["name"].apply(get_rdos)
-
-    df["ehull_reward"] = df["e_above_hull"].apply(ehull_reward)
-    df["reward"] = df.apply(
-        lambda r: score_by_method(
-            rollout_method, r["e_above_hull"], r["r_DOS"], beta, gamma
-        ),
-        axis=1,
+    return write_top_n_table(
+        df, out_path, config, n=n, synthesized=synthesized,
+        attempted_path=attempted_path, study_label=study_label,
+        key_fn=key_fn, space_filter=space_filter, latex_names=True,
     )
-
-    df_sorted = df.sort_values("reward", ascending=False).reset_index(drop=True)
-    top = df_sorted.head(n).copy()
-
-    global_ranks = rank_design_space(
-        mace_cache, doscar_peaks, rollout_method, gamma, beta,
-        key_fn=key_fn, space_filter=space_filter,
-    )
-
-    synth_sets = [_elem_set(s) for s in (synthesized or [])]
-    attempted_sets = _load_attempted_sets(attempted_path)
-
-    rows = []
-    for rank, (_, r) in enumerate(top.iterrows(), start=1):
-        name = r.get("name", r.get("formula", ""))
-        es = _elem_set(name)
-
-        if any(es == s for s in synth_sets):
-            synth = "Yes"
-        elif any(es == s for s in attempted_sets):
-            synth = "No"
-        else:
-            synth = "--"
-
-        rows.append({
-            'mcts_rank': rank,
-            'true_rank': global_ranks.get(key_fn(name)),
-            'name': str(name),
-            'latex_name': _latex_formula(name),
-            'e_hull': float(r.get("e_above_hull", np.nan)),
-            'r_ehull': float(r.get("ehull_reward", 0.0) or 0.0),
-            'r_dos': float(r.get("r_DOS", 0.0) or 0.0),
-            'product': float(r.get("reward", 0.0) or 0.0),
-            'synth': synth,
-        })
-
-    # Write LaTeX table
-    out = Path(out_path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(out, "w") as f:
-        f.write(f"% Top-{n} {study_label} compounds, product-mode study "
-                f"(gamma={gamma:g}, beta={beta:g}).\n")
-        f.write(f"% Global rank within design space by product reward r_Ehull x r_DOS.\n")
-        f.write("\\begin{tabular}{rrlrrrrc}\n")
-        f.write("\\toprule\n")
-        f.write("MCTS & True & Compound & $E_{\\mathrm{Hull}}$ & "
-                "$r_{E_{\\mathrm{Hull}}}$ & $r_{\\mathrm{DOS}}$ & "
-                "Product Reward & Synth \\\\\n")
-        f.write("\\midrule\n")
-
-        for row in rows:
-            tr = str(row['true_rank']) if row['true_rank'] is not None else "--"
-            f.write(f"{row['mcts_rank']} & {tr} & {row['latex_name']} & "
-                    f"{row['e_hull']:.4f} & {row['r_ehull']:.4f} & "
-                    f"{row['r_dos']:.1f} & {row['product']:.2f} & "
-                    f"{row['synth']} \\\\\n")
-
-        f.write("\\bottomrule\n")
-        f.write("\\end{tabular}\n")
-
-    return str(out)
 
 
 def write_product_mode_txt_table(

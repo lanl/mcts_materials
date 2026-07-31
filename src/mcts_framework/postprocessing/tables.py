@@ -52,6 +52,25 @@ def _load_attempted_sets(attempted_path: Optional[str]) -> List[set]:
         return []
 
 
+def _latex_formula(name: str) -> str:
+    """
+    Render a compound name with LaTeX count subscripts, U first then alphabetical.
+
+    e.g. 'Sn6Ti6U' -> 'UTi$_{6}$Sn$_{6}$'. Strips any '|SG|Wyckoff' identifier
+    suffix first. Order (U-first) matches the original product-mode tables.
+    """
+    formula = str(name).split("|")[0]
+    counts: dict = {}
+    for elem, count in re.findall(r"([A-Z][a-z]?)(\d*)", formula):
+        if elem:
+            counts[elem] = counts.get(elem, 0) + (int(count) if count else 1)
+    ordered = []
+    if "U" in counts:
+        ordered.append(("U", counts.pop("U")))
+    ordered.extend(sorted(counts.items()))
+    return "".join(e if c == 1 else f"{e}$_{{{c}}}$" for e, c in ordered)
+
+
 def write_top_n_table(
     df: pd.DataFrame,
     out_path: str,
@@ -62,6 +81,7 @@ def write_top_n_table(
     study_label: str = "",
     key_fn: Callable[[str], Hashable] = full_formula_key,
     space_filter: Optional[Callable[[str], bool]] = None,
+    latex_names: bool = False,
 ) -> str:
     """
     Write a LaTeX table of the top-`n` compounds from a run's results.
@@ -90,6 +110,9 @@ def write_top_n_table(
         space_filter: predicate selecting which compounds form the ranking
             design space. Default None ranks against every compound in the MACE
             cache; pass a predicate (e.g. a U-only filter) to restrict it.
+        latex_names: if True, render the Compound column with LaTeX count
+            subscripts (U first), e.g. 'UTi$_6$Sn$_6$'; default False writes the
+            plain formula.
 
     Returns:
         The path written (str).
@@ -156,15 +179,15 @@ def write_top_n_table(
         elif any(es == s for s in attempted_sets):
             synth = "No"
         else:
-            synth = "-"
+            synth = "--"
         rows.append((
             rank,
             global_ranks.get(key_fn(name)),
-            str(name),
-            float(r.get("r_DOS", 0.0) or 0.0),
-            float(r.get("ehull_reward", 0.0) or 0.0),
-            float(r.get("reward", 0.0) or 0.0),
+            _latex_formula(name) if latex_names else str(name).split("|")[0],
             float(r.get("e_above_hull", np.nan)),
+            float(r.get("ehull_reward", 0.0) or 0.0),
+            float(r.get("r_DOS", 0.0) or 0.0),
+            float(r.get("reward", 0.0) or 0.0),
             synth,
         ))
 
@@ -179,13 +202,14 @@ def write_top_n_table(
                 f"{len(global_ranks)}-compound {space_desc} design space.\n")
         f.write("\\begin{tabular}{rrlrrrrc}\n")
         f.write("\\toprule\n")
-        f.write("MCTS Rank & True Rank & Name & $r_{\\mathrm{DOS}}$ & "
-                "$r_{E_{\\mathrm{Hull}}}$ & Reward & E\\_hull & Synth" + eol)
+        f.write("MCTS Rank & True Rank & Compound & $E_{\\mathrm{Hull}}$ & "
+                "$r_{E_{\\mathrm{Hull}}}$ & $r_{\\mathrm{DOS}}$ & Reward & "
+                "Synthesized?" + eol)
         f.write("\\midrule\n")
-        for rank, gr, name, rdos, ehull_r, reward, ehull, synth in rows:
+        for rank, gr, name, ehull, ehull_r, rdos, reward, synth in rows:
             gr_s = str(gr) if gr is not None else "--"
-            f.write(f"{rank} & {gr_s} & {name} & {rdos:.4f} & {ehull_r:.4f} & "
-                    f"{reward:.4f} & {ehull:.4f} & {synth}" + eol)
+            f.write(f"{rank} & {gr_s} & {name} & {ehull:.4f} & {ehull_r:.4f} & "
+                    f"{rdos:.1f} & {reward:.2f} & {synth}" + eol)
         f.write("\\bottomrule\n")
         f.write("\\end{tabular}\n")
     return str(out)

@@ -93,8 +93,20 @@ class TestWriteTopNTable:
         expected = score_by_method("ehull_rdos_product", best.e_above_hull, best.dos_reward)
         body = [ln for ln in Path(out).read_text().splitlines()
                 if "&" in ln and "MCTS Rank" not in ln]
-        reward_cell = float(body[0].split("&")[5])
-        assert reward_cell == pytest.approx(expected, abs=1e-4)
+        # Columns: rank & true & compound & E_hull & r_ehull & r_DOS & Reward & synth
+        reward_cell = float(body[0].split("&")[6])
+        assert reward_cell == pytest.approx(expected, abs=1e-2)  # Reward printed .2f
+
+    def test_latex_names_renders_subscripts(self, tmp_path):
+        cfg = _make_config()
+        plain = write_top_n_table(_sample_df(), str(tmp_path / "plain.tex"), cfg, n=3)
+        latex = write_top_n_table(_sample_df(), str(tmp_path / "latex.tex"), cfg,
+                                  n=3, latex_names=True)
+        assert "$_{6}$" not in Path(plain).read_text()
+        # LaTeX names use count subscripts and put U first (e.g. UFe$_{6}$Ge$_{6}$).
+        latex_text = Path(latex).read_text()
+        assert "$_{6}$" in latex_text
+        assert "UFe$_{6}$Ge$_{6}$" in latex_text  # from Fe6Ge6U
 
     def test_missing_data_paths_raise(self, tmp_path):
         cfg = _make_config()
@@ -120,12 +132,13 @@ class TestWriteTopNTable:
         out = write_top_n_table(df, str(tmp_path / "r.tex"), cfg, n=2)
         body = [ln for ln in Path(out).read_text().splitlines()
                 if "&" in ln and "MCTS Rank" not in ln]
-        # r_DOS column (index 3) must be the real per-compound value, not 0.
-        rdos_cells = [float(ln.split("&")[3]) for ln in body]
+        # Columns: rank & true & compound & E_hull & r_ehull & r_DOS & Reward & synth
+        # r_DOS is column index 5, printed .1f.
+        rdos_cells = [float(ln.split("&")[5]) for ln in body]
         assert all(v > 0 for v in rdos_cells), f"r_DOS not recovered: {rdos_cells}"
         # And it must match the DOSCAR lookup on the plain formula.
         assert rdos_cells[0] == pytest.approx(
-            max(lookup.get_reward("Cr6Sn6U"), lookup.get_reward("Fe6Ge6U")), abs=1e-3
+            max(lookup.get_reward("Cr6Sn6U"), lookup.get_reward("Fe6Ge6U")), abs=0.1
         )
 
 
