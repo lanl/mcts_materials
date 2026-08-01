@@ -141,6 +141,32 @@ class TestWriteTopNTable:
             max(lookup.get_reward("Cr6Sn6U"), lookup.get_reward("Fe6Ge6U")), abs=0.1
         )
 
+    def test_identifier_names_resolve_true_rank_and_synth(self, tmp_path):
+        # Regression: with 'formula|SG|Wyckoff' identifier names, the True Rank
+        # lookup and synthesized/attempted matching must strip the suffix (not
+        # read 'SG'/Wyckoff letters as elements). Previously True Rank came out
+        # '--' and synth never matched for identifier-named rows.
+        cfg = _make_config()  # full-space ranking (space_filter=None)
+        df = pd.DataFrame({
+            "name": ["Fe6Ge6U|SG191|Fe6i-Ge2c-U1a", "Co6Sn6U|SG191|x"],
+            "e_above_hull": [0.01, 0.02],
+        })
+        # 'Fe6Ge6U' as a dash-form synthesized entry must match despite the suffix.
+        out = write_top_n_table(df, str(tmp_path / "id.tex"), cfg, n=2,
+                                synthesized=["U-Ge-Fe"])
+        body = [ln for ln in Path(out).read_text().splitlines()
+                if "&" in ln and "MCTS Rank" not in ln]
+        rows = [[c.strip() for c in ln.rstrip(" \\").split("&")] for ln in body]
+        # Every row: True Rank (col 1) resolves to a real integer, not '--';
+        # Compound (col 2) is the plain formula with no '|' suffix.
+        for cols in rows:
+            assert cols[1] != "--" and int(cols[1]) >= 1
+            assert "|" not in cols[2]
+        # The Fe6Ge6U row matches the U-Ge-Fe synthesized entry (col -1 'Yes'),
+        # proving suffix-stripped element-set matching.
+        fe_row = next(c for c in rows if c[2] == "Fe6Ge6U")
+        assert fe_row[-1] == "Yes"
+
 
 class TestConfigDumpYaml:
     def test_redacts_api_key_and_roundtrips(self, tmp_path):

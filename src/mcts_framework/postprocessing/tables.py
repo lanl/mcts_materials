@@ -173,7 +173,11 @@ def write_top_n_table(
     rows = []
     for rank, (_, r) in enumerate(top.iterrows(), start=1):
         name = r.get("name", r.get("formula", ""))
-        es = _elem_set(name)
+        # Strip any "|SG|Wyckoff" identifier suffix before element-set matching
+        # so 'SG'/Wyckoff letters aren't read as spurious elements (which would
+        # break the synthesized/attempted match). full_formula_key strips it too.
+        formula = str(name).split("|")[0]
+        es = _elem_set(formula)
         if any(es == s for s in synth_sets):
             synth = "Yes"
         elif any(es == s for s in attempted_sets):
@@ -183,7 +187,7 @@ def write_top_n_table(
         rows.append((
             rank,
             global_ranks.get(key_fn(name)),
-            _latex_formula(name) if latex_names else str(name).split("|")[0],
+            _latex_formula(name) if latex_names else formula,
             float(r.get("e_above_hull", np.nan)),
             float(r.get("ehull_reward", 0.0) or 0.0),
             float(r.get("r_DOS", 0.0) or 0.0),

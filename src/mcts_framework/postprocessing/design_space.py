@@ -32,9 +32,14 @@ def full_formula_key(name) -> str:
     pass a custom key_fn to the ranking functions - e.g. one returning
     IntermetallicStructure.get_identifier() (formula|SG|Wyckoff) or a molecule's
     canonical SMILES. The ranking logic is agnostic to what the key is.
+
+    A full "formula|SG|Wyckoff" identifier is accepted: only the leading formula
+    (before the first '|') is parsed, so passing a raw identifier keys by its
+    composition rather than picking up 'SG'/Wyckoff letters as spurious elements.
     """
+    formula = str(name).split("|")[0]
     counts: Dict[str, int] = {}
-    for el, n in re.findall(r"([A-Z][a-z]?)(\d*)", str(name)):
+    for el, n in re.findall(r"([A-Z][a-z]?)(\d*)", formula):
         if el:
             counts[el] = counts.get(el, 0) + (int(n) if n else 1)
     return "".join(f"{el}{counts[el]}" for el in sorted(counts))

@@ -12,9 +12,6 @@ the formation energy (ranking is by formation energy only). These paths are pure
 import math
 
 import pandas as pd
-import pytest
-
-pytest.importorskip("ase")  # MaceEvaluator imports ASE-adjacent helpers lazily
 
 from mcts_framework.intermetallic import UnstablePenalty
 from mcts_framework.intermetallic.evaluator import MaceEvaluator
