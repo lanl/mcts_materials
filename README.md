@@ -1,410 +1,272 @@
-# MCTS Materials
+# MCTS Framework for Materials Discovery
 
-A Monte Carlo Tree Search (MCTS) implementation for discovering and optimizing stable intermetallic crystal structures containing uranium and f-block elements by iteratively exploring chemical space guided by thermodynamic stability (energy above hull) and electronic density-of-states (rDOS) metrics.
+A clean, modular Monte Carlo Tree Search (MCTS) implementation for discovering
+optimal materials through intelligent exploration of chemical space. The search
+core is completely material-agnostic; crystals, molecules, and any custom
+material type plug in through four small interfaces.
 
-## Overview
+## Features
 
-This project applies MCTS, a reinforcement learning algorithm traditionally used in game playing, to the problem of materials discovery. The algorithm intelligently explores the vast chemical space of possible crystal structures by:
+- **Material-agnostic core** — the MCTS algorithm knows nothing about
+  chemistry; it operates on abstract `Material` / `MoveGenerator` /
+  `PropertyEvaluator` / `RewardFunction` interfaces.
+- **Two built-in material types**
+  - **Intermetallic crystals** — periodic-table element substitution, MACE +
+    Materials Project energies, DOSCAR rDOS rewards (ported from the validated
+    `mcts_crystal` codebase).
+  - **Molecules** — functional-group substitution via `molecule-modifier`,
+    ML property prediction (melting point, H₂ capacity, synthesizability).
+- **Four selection strategies** — UCB1, PUCT, ε-greedy, Boltzmann.
+- **Type-safe config** — Pydantic models load/validate YAML or JSON.
+- **Async-first** — property evaluation runs in a thread pool.
+- **No-duplicate tree** — reserve-on-attach dedup guarantees each material
+  appears at most once, without ever losing an unclaimed candidate.
+- **Visualization & analysis** — convergence plots, search-tree diagrams,
+  property histograms, efficiency metrics, and a text report.
+- **Lightweight core** — heavy deps (ASE/MACE/pymatgen, RDKit,
+  matplotlib/networkx) are optional extras, lazily imported.
 
-1. **Selection**: Choosing promising compounds to explore using Upper Confidence Bound (UCB) criteria
-2. **Expansion**: Generating new candidate structures through element substitution
-3. **Simulation**: Evaluating structures using a sharp tanh-transformed energy-above-hull reward and/or a DOSCAR-derived electronic structure reward (rDOS)
-4. **Backpropagation**: Updating the search tree based on discovered rewards
+## Architecture
 
-The search focuses on intermetallic compounds with transition metals, Group IV elements (Si, Ge, Sn, Pb), and f-block elements (lanthanides and actinides), aiming to discover thermodynamically stable or metastable structures with favorable electronic structure near the Fermi level.
+The four interfaces you implement (or reuse) to search any material space:
 
-## Key Features
+```python
+from mcts_framework import Material, MoveGenerator, PropertyEvaluator, RewardFunction
 
-- **Intelligent exploration** of chemical space using MCTS, with a choice of five child-selection strategies (`ucb1`, `epsilon_greedy`, `boltzmann`, `puct`, `hybrid`) via `--selection-mode`
-- **Three rollout methods** (`ehull`, `ehull_rdos`, `rdos`) for stability- and/or electronic-structure-guided search
-- **Flexible f-block substitution modes** (U-only, full f-block, experimental, lanthanides+U, or extended lanthanides+U)
-- **High-throughput energy calculations** using cached MACE results
-- **Comprehensive visualization** including tree structures, energy distributions, and iteration progress
-- **Automated analysis** with efficiency metrics and compound ranking
-- **Hyperparameter sensitivity studies** (replicate-run convergence sweeps) for calibrating MCTS-algorithm parameters - see [Sensitivity Studies](#sensitivity-studies)
+class MyMaterial(Material):
+    def get_identifier(self) -> str: ...   # unique key (dedup + caching)
+    def copy(self) -> "MyMaterial": ...
+
+class MyMoves(MoveGenerator[MyMaterial]):
+    def generate_moves(self, material): ...    # enumerate neighbors
+
+class MyEvaluator(PropertyEvaluator):
+    async def _compute(self, material) -> dict: ...   # compute properties
+
+class MyReward(RewardFunction):
+    def compute_reward(self, properties) -> float: ...  # score them
+```
+
+The `MCTS` class composes these with a `SelectionStrategy` and runs the
+selection → expansion → simulation → backpropagation loop. See
+`examples/custom_material.py` for a complete, dependency-free example.
 
 ## Installation
 
-### Requirements
+Pick whichever environment manager you prefer. The optional-dependency groups
+are the same either way:
 
-Python 3.9+. The package is installed via `pip` using `pyproject.toml`, in one of three sizes depending on what you need:
+| Extra | Pulls in | Needed for |
+| --- | --- | --- |
+| _(none)_ | numpy, pandas, pydantic, pyyaml, tqdm, typer | core + `rdos`-only runs + tests |
+| `intermetallic` | ASE, spglib, MACE, pymatgen, matbench-discovery | `ehull*` rollout methods |
+| `molecule` | RDKit (+ molecule-modifier, installed separately) | molecule search |
+| `viz` | matplotlib, seaborn, networkx | plots + `mcts-run figures` |
+| `dev` | pytest, ruff, black, mypy | running the test suite |
+| `all` | everything above | — |
+
+### Option 1 — pip
 
 ```bash
-pip install ase pandas numpy matplotlib scipy mace-torch matbench-discovery
+pip install -e .                      # core only
+pip install -e ".[intermetallic]"     # + intermetallic support
+pip install -e ".[molecule]"          # + molecule support
+pip install -e ".[viz]"               # + visualization
+pip install -e ".[all]"               # everything + dev tools
 ```
 
-`pip install -r requirements.txt` is equivalent to `pip install -e .[full]` and still works if that's the habit you're in.
+### Option 2 — uv
 
-The core install (no `[full]`) is intentionally lightweight: `rollout-method rdos` and the test suite don't need MACE, Materials Project, or pymatgen at all, so you can work on the search algorithm itself without installing the heavier ML/DFT stack.
-
-Once installed, you get a console command in addition to the script entry point:
+[uv](https://docs.astral.sh/uv/) creates a project-local `.venv` from this
+`pyproject.toml`, independent of conda. `uv sync` also writes a reproducible
+`uv.lock`.
 
 ```bash
-mcts-run --rollout-method ehull_rdos --beta 1.0 --gamma 0.0001   # equivalent to: python run_mcts.py --rollout-method ehull_rdos ...
+uv sync --python 3.11 --extra intermetallic --extra viz --extra dev
+# or everything:
+uv sync --python 3.11 --extra all
 ```
 
-### Setup
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd mcts_materials
-```
-
-2. Get a Materials Project API key (if using energy above hull):
-   - Register at https://materialsproject.org/
-   - Navigate to your dashboard and copy your API key
-   - **Note**: API key is required for rollout methods `ehull` and `ehull_rdos`
-   - Not needed for `--rollout-method rdos` (rDOS only)
+With uv, prefix the commands below with `uv run` (e.g. `uv run mcts-run …`,
+`uv run pytest`) — no manual environment activation needed. The rest of this
+README shows the bare commands; they assume an activated env (pip) or an
+implicit `uv run` prefix (uv).
 
 ## Usage
 
-### Basic Usage
-
-With `config.json` set up (see above):
+### Command line
 
 ```bash
-python run_mcts.py
+# Validate a config without running (fast check before a long job):
+mcts-run validate --config examples/config_intermetallic.yaml
+
+# Run a search:
+mcts-run run --config examples/config_intermetallic.yaml
+mcts-run run --config examples/config_molecule.yaml
 ```
 
-Without `config.json`, pass the key explicitly:
+Each run writes to the configured `output_dir`:
+- `summary.json` — run summary (best material, reward, tree size)
+- `best_materials.csv` — top materials ranked by own reward, with properties
+- `convergence.csv` — per-iteration best reward and unique-material count
+- `report.txt` — human-readable analysis report
+- `config.yaml` — the exact config the run used (Materials Project key redacted)
+- `tree.json` — the explored search tree (structure + per-node stats/properties)
+
+### Post-run figures & tables
+
+`config.yaml` and `tree.json` make each run self-describing, so publication
+figures are regenerated straight from a finished run directory — no per-study
+script and no parameters to re-specify (gamma, reward method, and data paths all
+come from the run's own `config.yaml`):
 
 ```bash
-python run_mcts.py --mp-api-key YOUR_API_KEY
+mcts-run run     --config study.yaml       # writes results + config.yaml + tree.json
+mcts-run figures --run-dir mcts_results    # regenerates table + both figures
 ```
 
-The default rollout method is `ehull`, which needs the Materials Project API key but no DOSCAR data. To run with no API key at all, use `--rollout-method rdos` (requires `doscar_peaks_data_with_U.csv`).
+`mcts-run figures` writes into `<run-dir>/figures/` (override with `--out-dir`):
 
-This will:
-- Use the default starting structure (`examples/mat_Pb6U1W6_sg191.cif`)
-- Run 1000 iterations
-- Save results to `mcts_results/` directory
-- Generate visualizations and analysis reports
+- `top{N}_table.tex` — top-N candidate LaTeX table (`--top-n`, default 15), with
+  a "True Rank" column ranking each pick against the full design space
+- `ehull_vs_rdos.png` — E_hull vs r_DOS scatter: full design space (backdrop)
+  plus the run's top-N overlay
+- `radial_tree.png` — 4-panel radial search tree (reward / r_ehull / γ·r_DOS /
+  Q·N⁻¹), root starred, expansion edges bold
 
-### Example Commands
+Needs the `[viz]` extra (and, for intermetallics, the MACE cache + DOSCAR data
+referenced by the config). The same outputs are available programmatically via
+`mcts_framework.postprocessing.generate_study_outputs(run_dir)`.
+
+### Python API
+
+```python
+import asyncio
+from mcts_framework import MCTS, UCB1
+from mcts_framework.intermetallic import (
+    IntermetallicStructure, PeriodicTableMoves, MaceEvaluator,
+    DoscarRewardLookup, create_intermetallic_reward,
+)
+from ase.io import read
+
+atoms = read("structure.cif")
+doscar = DoscarRewardLookup("doscar_peaks_data_with_U.csv")
+
+mcts = MCTS(
+    root_material=IntermetallicStructure(atoms),
+    move_generator=PeriodicTableMoves(f_block_mode="u_only"),
+    property_evaluator=MaceEvaluator(mp_api_key="..."),
+    reward_function=create_intermetallic_reward("ehull_rdos", doscar,
+                                                beta=1.0, gamma=0.0001),
+    selection_strategy=UCB1(),
+    exploration_constant=0.1,
+)
+
+asyncio.run(mcts.run(iterations=1000))
+for node in mcts.get_best_materials(n=10):
+    print(node.material.get_identifier(), node.own_reward)
+```
+
+Runnable example scripts:
+- `examples/custom_material.py` — dependency-free toy material (great starting point)
+- `examples/run_intermetallic.py` — crystal search (rDOS reward; needs `[intermetallic]`)
+- `examples/run_molecule.py` — molecule search (needs `[molecule]` + molecule-modifier)
+
+**Production studies**: The `intermetallic_study/` directory contains complete configurations for:
+- **U-only** and **Lanthanide+U** product-mode studies (5 seeds each, 1000/500 iterations)
+- **Sensitivity analyses** across 4 hyperparameters (starting material, termination limit, rollout depth, move step)
+  - 18 systematic runs varying one parameter while holding others constant
+  - Publication-quality 3"×3" learning curves showing exploration vs. reward trade-offs
+
+See [`intermetallic_study/README.md`](intermetallic_study/README.md) for details.
+
+Migrating from the original `mcts_crystal` code? See [MIGRATION.md](MIGRATION.md).
+
+## Project structure
+
+```
+mcts_materials/          # repo root
+├── src/mcts_framework/
+│   ├── core/           # Material-agnostic: interfaces, SearchNode, selection, MCTS, config
+│   ├── intermetallic/  # Crystal structures, periodic-table moves, MACE/MP evaluator, rewards
+│   ├── molecule/       # RDKit structures, functional-group moves, ML evaluator, rewards
+│   ├── viz/            # Analysis (metrics/report) and plots (convergence/tree/distribution)
+│   ├── postprocessing/ # Regenerate study outputs from a run: tables, scatter, radial tree, driver
+│   └── cli/            # `mcts-run` entry point (Typer): main, builders, results
+├── tests/              # pytest suite (core is dependency-free; material tests skip if deps absent)
+├── examples/           # Config templates, run_intermetallic.py, run_molecule.py, custom_material.py
+├── intermetallic_study/  # Production studies: u_only, lanthanide_u, sensitivity analyses
+└── reference/          # Kept-aside material (legacy sensitivity_studies/ for reference)
+```
+
+## Design notes
+
+### Identity / deduplication
+- **Intermetallics**: identifier is `<formula>|SG<number>|<Wyckoff-decoration>`
+  (via spglib), so different site decorations at equal composition never
+  collide, and atom reordering is irrelevant.
+- **Molecules**: identifier is the RDKit canonical SMILES.
+- The tree reserves a material's identifier **only when it is attached** as a
+  child; a candidate generated but not yet attached stays available to whoever
+  attaches it first — no duplicates, nothing lost.
+
+### Ranking
+`get_best_materials()` ranks by each node's **own** evaluated reward
+(`own_reward`), not the backprop-accumulated subtree maximum (`subtree_best`),
+so internal nodes don't inherit their best descendant's score. Likewise the
+run-level `best_node` / `best_reward` track `own_reward`, so the reported best
+material and its reward are always self-consistent.
+
+### Preserved physics
+The intermetallic rewards preserve the validated constants from `mcts_crystal`:
+`ehull_reward = -tanh(120·(E_hull − 0.05))` and rDOS Gaussian width σ = 0.5 eV.
+
+### Search behavior (matches current `mcts_crystal`)
+- **`move_step`** (intermetallic): max positions a substitution may jump along
+  the transition-metal / Group IV / lanthanide axes (default 1 = adjacent;
+  3 = extended-range). This is the sole knob for jump distance.
+- **`u_bridge`** (intermetallic): which lanthanides U(92) connects to in the
+  lanthanide/U modes — `narrow` (Nd only, default) or `wide` (Nd/Gd/Er).
+  `move_step` (jump distance) and `u_bridge` (U connectivity) are orthogonal;
+  together they replace the old conflated `lanthanides_u_extended` mode.
+- **`rollout_aggregation`** (core): how a node's `n_rollout` samples combine —
+  `max` (default; extra samples discounted by `0.9**rollout_depth`) or `mean`
+  (unbiased average of undiscounted samples).
+- **max-along-walk rollouts**: a depth>0 rollout scores every composition along
+  the random walk and returns the max, extracting up to `rollout_depth`
+  candidate evaluations per walk instead of only the endpoint.
+
+### `search_mode` — efficiency vs. breadth
+Controls when the run stops, trading evaluation cost (DFT/MACE calls) against
+top-N coverage:
+- **`fast`** (default): stop as soon as the root converges (its
+  no-improvement countdown fires). Fewest evaluations; finds the single
+  optimum quickly.
+- **`thorough`**: ignore root convergence and use the full `iterations`
+  budget (stopping early only on true exhaustion — every branch terminated).
+  Explores more compounds for a better ranked top-N candidate list, at the
+  cost of more evaluations. Pair with a larger `exploration_constant` for
+  wider coverage.
+
+## Development
 
 ```bash
-# E_hull only - MACE + Materials Project, no DFT/DOSCAR data needed
-python run_mcts.py --iterations 1000 --rollout-method ehull
+# pip:
+pip install -e ".[dev]"
+pytest                    # run the suite
 
-# E_hull + rDOS (the published study's reward)
-python run_mcts.py --iterations 1000 --rollout-method ehull_rdos --beta 1.0 --gamma 0.0001
-
-# rDOS only
-python run_mcts.py --iterations 1000 --rollout-method rdos
-
-# Full f-block exploration
-python run_mcts.py --iterations 1000 --f-block-mode full_f_block --rollout-method ehull_rdos
+# uv:
+uv sync --extra dev
+uv run pytest
 ```
 
-To reproduce the published U-only `ehull_rdos` study and its figures end to end, see [analysis/ehull_rdos_u_only_study/](analysis/ehull_rdos_u_only_study/run_study.sh).
-
-## Hyperparameters
-
-### Core MCTS Parameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `--iterations` | 1000 | Number of MCTS iterations to perform |
-| `--structure` | `examples/mat_Pb6U1W6_sg191.cif` | Path to starting crystal structure (CIF format) |
-| `--output` | `mcts_results` | Output directory for results and visualizations |
-
-### Search Strategy Parameters
-
-| Parameter | Default | Options | Description |
-|-----------|---------|---------|-------------|
-| `--rollout-method` | `ehull` | `ehull`, `ehull_rdos`, `rdos` | Rollout evaluation method |
-| `--beta` | 1.0 | float | Weight for the E_hull reward in `ehull_rdos` |
-| `--gamma` | 0.0001 | float | Weight for the rDOS reward in `ehull_rdos` |
-| `--mp-api-key` | None | string | Materials Project API key (required for `ehull`, `ehull_rdos`; prefer `config.json`) |
-| `--exploration-constant` | 0.1 | float | UCB1/PUCT exploration constant `c` (higher = more exploration vs exploitation) |
-| `--selection-mode` | `ucb1` | `ucb1`, `epsilon_greedy`, `boltzmann`, `puct`, `hybrid` | Child-selection strategy for the selection phase - see [Child Selection Methods](#child-selection-methods) |
-| `--epsilon` | 0.2 | float | Exploration rate, used by `epsilon_greedy`/`hybrid` selection modes only |
-| `--temperature` | 1.0 | float | Softmax temperature, used by `boltzmann` selection mode only |
-| `--f-block-mode` | `u_only` | `u_only`, `full_f_block`, `experimental`, `lanthanides_u`, `lanthanides_u_extended` | F-block element substitution strategy |
-| `--transition-metal` | None | element symbol | Override the transition metal in the starting structure |
-| `--group-iv` | None | element symbol | Override the Group IV element in the starting structure |
-| `--no-labels` | False | flag | Turn off labels in radial tree visualization |
-
-### Rollout Method Details
-
-- **`ehull` (default)**: Sharp tanh-transformed energy above hull
-  - `ehull_reward(E_hull) = -tanh(120 * (E_hull - 0.05))` — a sharp transition around the 0.05 eV/atom stability threshold (≈+1 for stable compounds, ≈-1 for unstable ones)
-  - Reward = `ehull_reward(E_hull)`
-  - **Requires a Materials Project API key. Does not require DOSCAR/DFT data.**
-
-- **`ehull_rdos`**: E_hull + electronic density-of-states reward, the formulation used in the published study
-  - Reward = `beta * ehull_reward(E_hull) + gamma * r_DOS`
-  - Default `beta=1.0`, `gamma=0.0001`
-  - **Requires a Materials Project API key and `doscar_peaks_data_with_U.csv`.**
-
-- **`rdos`**: DOSCAR-derived electronic structure reward only
-  - Reward = `r_DOS`, computed in real time from `doscar_peaks_data_with_U.csv`
-  - **Requires `doscar_peaks_data_with_U.csv`. Does not require MACE or a Materials Project API key.**
-
-Formation energy (`e_form`) is always computed and logged on every node and in every output CSV for reference, but it is not part of any of the three rewards above.
-
-### Materials Project API Key
-
-The Materials Project API is used to calculate **energy above hull**, which measures thermodynamic stability against decomposition. This requires querying the Materials Project database for phase diagram information.
-
-**When is the API key required?**
-- Required for rollout methods: `ehull`, `ehull_rdos`
-- Not required for: `rdos`
-
-**How to provide your API key:**
-- Preferred: copy `config.example.json` to `config.json` and set `mp_api_key` there (gitignored, read locally, never pushed)
-- Or: `python run_mcts.py --mp-api-key YOUR_API_KEY --rollout-method ehull_rdos`
-
-**What happens without an API key?**
-- If you try to use `ehull` or `ehull_rdos` without an API key, the script will exit with an error
-- Use `--rollout-method rdos` to run without an API key (still requires `doscar_peaks_data_with_U.csv`)
-
-### F-Block Substitution Modes
-
-- **`u_only`** (Default): Only uranium (U) substitutions allowed
-  - Fastest, focused search
-  - Ideal for uranium-containing intermetallics
-
-- **`full_f_block`**: Full lanthanide and actinide series
-  - Explores lanthanides (Ce-Lu) and actinides (Th-Pu)
-  - Allows "vertical" moves between analogous elements
-  - Larger search space
-
-- **`experimental`**: Lanthanides (minus La) plus uranium
-  - Focuses on experimentally accessible actinides
-  - Excludes La, includes Ce-Lu and U
-  - Good balance of search space and practicality
-
-- **`lanthanides_u`**: All lanthanides (Ce-Lu) plus U, ±1 nearest-neighbor moves
-
-- **`lanthanides_u_extended`**: All lanthanides (Ce-Lu) plus U, ±3 moves
-  - Faster exploration of heavy lanthanides (Tm, Yb, Lu) from any starting point
-
-### Internal Parameters (Fixed defaults, overridable on the CLI)
-
-- `--rollout-depth`: 1 (depth of random substitutions during rollout)
-- `--n-rollout`: 5 (number of rollout simulations per expansion)
-- `--rollout-aggregation`: `max` (how the `--n-rollout` reward samples are combined into a node's reward)
-  - `max` (default): take the best of the samples - optimistic, biased upward by however many samples are drawn (a node sampled more times looks better on average even with no real difference in quality). The `n_rollout - 1` extra (depth > 0) samples are discounted by `0.9 ** rollout_depth` before the comparison, since a speculative sample wandered further from the node is less informative about the node's own quality.
-  - `mean`: plain average across the samples - an unbiased estimate of the node's expected reward, at the cost of being more pessimistic about a node whose extra speculative samples happened to land on worse compositions. The extra samples are **not** discounted here: multiplying them by `0.9 ** rollout_depth` and then averaging with an unweighted `n` would just drag the mean toward zero by an amount that grows with `n_rollout`/`rollout_depth`, which isn't a meaningful confidence weighting (zero isn't a neutral reward in this scheme) - so `mean` uses the raw, undiscounted samples instead.
-
-See [Child Selection Methods](#child-selection-methods) for `--selection-mode`, `--epsilon`, and `--temperature`.
-
-## Data Availability
-
-This repository ships **no proprietary DFT/DOSCAR data**. The high-throughput energy/DOS database underlying this work has not been publicly released yet, so the following files are gitignored and must be supplied locally — they are never committed or pushed:
-
-| File (repo root) | Required by | Schema |
-|---|---|---|
-| `high_throughput_mace_results.full.csv` | all rollout methods | CSV with columns `name` (chemical formula, e.g. `Ti6Si6Ce`), `e_form` (eV/atom), `e_above_hull` (eV/atom), `e_decomp` (eV/atom), `source` (free text) |
-| `doscar_peaks_data_with_U.csv` | `ehull_rdos`, `rdos` | Raw DOSCAR peak data (`COMPOUND_NAME`, `PEAK_ENERGY`, `PEAK_WIDTH`, `PEAK_HEIGHT`). rDOS is always computed in real time from this file (Gaussian-weighted sum of peak intensity near the Fermi level — see `mcts_crystal/doscar_utils.py:DoscarRewardLookup`); there is no precomputed rewards cache |
-
-If you don't have these files, `run_mcts.py` will exit with a clear error naming the missing file rather than silently degrading. Once the underlying high-throughput study is released, these files will be published alongside it — check the paper / repo announcements for the data DOI.
-
-`high_throughput_mace_results.full.csv` also acts as a cache: any new compound MACE evaluates during a run is appended to it, so subsequent runs reuse prior calculations.
-
-## Output Files
-
-After running MCTS, the output directory contains:
-
-### Visualizations
-
-- **`radial_tree_visualization.png`**: Tree structure showing explored compounds and their relationships
-- **`energy_distribution.png`**: Formation energy distribution for top compounds
-- **`iteration_progress.png`**: Best formation energy found over iterations
-- **`energy_above_hull_distribution.png`**: Energy above hull distribution
-- **`energy_above_hull_progress.png`**: Best energy above hull over iterations
-- **`formation_energy_by_elements.png`**: Heatmap showing formation energies by element combination
-- **`energy_above_hull_by_elements.png`**: Heatmap showing hull energies by element combination
-
-### Data Files
-
-- **`all_compounds.csv`**: Complete list of all explored compounds with energies and statistics
-- **`convergence_history.csv`**: Best composite reward (`best_reward`), and best E_form/E_hull/rDOS compound found, per iteration
-- **`mcts_report.txt`**: Detailed text report with search efficiency metrics
-- **`mcts_object.pkl`**: Pickled `MCTS` object, for offline re-analysis/plotting (e.g. `create_composite_radial_tree.py`)
-
-### Report Contents
-
-The text report includes:
-- Best compounds discovered (by formation energy and hull stability)
-- Search efficiency metrics
-- Number of compounds within 100 meV of convex hull
-- Diversity of explored chemical space
-
-## Understanding the Results
-
-### Key Metrics
-
-- **Formation Energy (e_form)**: Energy per atom relative to elemental references (reference metric only - not part of the reward)
-  - Negative values indicate exothermic formation (stable)
-  - More negative = more stable
-
-- **Energy Above Hull (e_above_hull)**: Energy above the convex hull of stable phases
-  - Zero or negative = thermodynamically stable
-  - 0-0.1 eV/atom = potentially synthesizable metastable phase
-  - \>0.1 eV/atom = likely unstable against decomposition
-
-- **rDOS**: Gaussian-weighted sum of DOS peak height/intensity near the Fermi level
-  - Higher = sharper, more intense electronic structure features near E_F (a proxy for heavy-fermion/correlated-electron character)
-
-### Interpreting Visualizations
-
-- **Tree visualization**: Shows parent-child relationships and exploration paths
-  - Node size indicates visit frequency
-  - Color indicates formation energy (cooler = more stable)
-
-- **Energy distributions**: Show the landscape of discovered compounds
-  - Look for clusters of low-energy compounds
-
-- **Progress plots**: Show learning efficiency
-  - Steeper drops indicate effective exploration
-  - Plateaus suggest converged search
-
-## Project Structure
-
-```
-mcts_materials/
-├── run_mcts.py                    # Thin compatibility wrapper - delegates to mcts_crystal/cli.py
-├── pyproject.toml                  # Package metadata, dependencies/extras, mcts-run entry point
-├── config.example.json            # Local config template (copy to config.json, gitignored)
-├── requirements.txt                # Equivalent to `pip install -e .[full]`
-├── .gitignore                      # Excludes config.json, data files, caches, run outputs
-├── mcts_crystal/                  # Core MCTS package
-│   ├── __init__.py
-│   ├── cli.py                     # run_mcts.py/mcts-run implementation (argument parsing, config loading)
-│   ├── mcts.py                    # MCTS algorithm implementation
-│   ├── node.py                    # Tree node, substitution logic, reward functions
-│   ├── energy_calculator.py       # MACE + Materials Project energy interface (lazy-imported, optional)
-│   ├── doscar_utils.py            # DOSCAR/rDOS reward lookup
-│   ├── visualization.py           # Plotting and visualization
-│   └── analysis.py                # Results analysis tools
-├── tests/                          # pytest suite (mocks MACE/Materials Project; no [full] install needed)
-├── .github/workflows/tests.yml     # CI: runs the test suite on push/PR
-├── examples/
-│   └── mat_Pb6U1W6_sg191.cif      # Default starting structure
-├── analysis/
-│   ├── ehull_rdos_u_only_study/              # Scripts to reproduce the published U-only ehull_rdos study and figures
-│   ├── ehull_rdos_u_only_study_normalized/   # Same study, gamma normalized to 1/(max raw r_DOS) instead of the calibrated 0.0001
-│   ├── ehull_rdos_u_only_study_mean_rollout/ # Same study, --rollout-aggregation mean instead of the default max
-│   └── ehull_rdos_u_only_study_final/        # Final parameters: normalized gamma + mean rollout aggregation
-├── sensitivity_studies/           # Replicate-run hyperparameter sensitivity sweeps (see Sensitivity Studies)
-│   ├── scripts/                   # Generation scripts (run_all.sh reproduces everything)
-│   └── results/                   # Per-sweep convergence_data.csv + figures
-├── high_throughput_mace_results.full.csv  # NOT bundled - see Data Availability
-└── doscar_peaks_data_with_U.csv            # NOT bundled - see Data Availability
-```
-
-## Reproducing the Published Study
-
-`analysis/ehull_rdos_u_only_study/` contains the scripts used to run and analyze the U-only `ehull_rdos` study (U-only f-block mode; `--rollout-method ehull_rdos`, plus `iterations`/`selection_mode`/`exploration_constant`/`beta`/`gamma`/`transition_metal`/`group_iv` all read from `config.json` rather than hardcoded in the script - see `config.json`/`config.example.json` for current values):
-
-- `run_study.sh`: runs `run_mcts.py` with the published settings, then calls `generate_plots.sh`
-- `generate_plots.sh`: regenerates all figures (E_hull-vs-rDOS scatter, convergence-by-starting-material plot, composite-colored radial tree) and the top-15 LaTeX table via `generate_figures.py`
-- `sweep_starting_material.py`: replicate-run sweep (5 seeds each) across starting materials at increasing move-graph distance from the global-best compound, feeding `convergence_by_starting_material.png`
-
-This requires `high_throughput_mace_results.full.csv` and `doscar_peaks_data_with_U.csv` locally (see [Data Availability](#data-availability)), and a Materials Project API key via `config.json` or `MP_API_KEY`.
-
-`analysis/ehull_rdos_u_only_study_normalized/` is the same study with gamma fixed to `1 / (max raw r_DOS across the 108 U-only compounds)` = `1/2516.1664410449775` ≈ `0.0003974`, instead of the calibrated `0.0001` - this normalizes the `gamma*r_DOS` term to top out at 1.0, the same scale as `ehull_reward`'s ~[-1,1] range. Unlike the calibrated study, gamma here is hardcoded in `generate_figures.py`/`create_composite_radial_tree.py` and passed explicitly via `--gamma` in `run_study.sh` rather than read from `config.json` (which stays at the calibrated 0.0001). It has its own `sweep_starting_material.py`/`convergence_by_starting_material.png` (`starting_material_sweep_normalized/`), since the calibrated study's sweep uses gamma=0.0001 and the normalized gamma also shifts which compound is the true global-best target (UTi6Sn6 here vs. UZr6Pb6 for the calibrated study), so the starting-material ladder had to be rechosen to land on clean edit distances to the new target.
-
-`analysis/ehull_rdos_u_only_study_final/` combines both parameter changes: `gamma = 1/2516.1664410449775` (normalized) and `--rollout-aggregation mean` — the final settled parameters for this study. It has its own `sweep_starting_material.py`/`convergence_by_starting_material.png` (`starting_material_sweep_final/`, using the same Cr/Fe/Ni/Pt6Sn6U d=2/4/6/8 ladder as the normalized study since gamma determines the global-best target).
-
-`analysis/ehull_rdos_u_only_study_mean_rollout/` is the same study (calibrated gamma=0.0001 unchanged) with `--rollout-aggregation mean` instead of the default `max` (see [Hyperparameters](#hyperparameters) below) - a node's reward is the plain average of its rollout samples rather than the optimistic max, and the depth discount is dropped for the extra samples (see `mcts_crystal/mcts.py`'s `_run_rollout_samples`). It also has its own `sweep_starting_material.py`/`convergence_by_starting_material.png` (`starting_material_sweep_mean_rollout/`, same starting-material ladder as the calibrated study since gamma - and therefore the global-best target - is unchanged here, only `rollout_aggregation='mean'` is added to each replicate).
-
-## Sensitivity Studies
-
-`sensitivity_studies/` holds replicate-run sensitivity sweeps (5 seeds x 500 iterations per value tested) used to calibrate MCTS-algorithm hyperparameters - `exploration_constant`, starting material, `selection_mode`, and `n_rollout`/`rollout_depth`/`termination_limit` - against the calibrated U-only `ehull_rdos` baseline. The reward formula's physics-informed constants (ehull_reward sharpness=120, E_hull threshold=0.05, rDOS sigma=0.5) are intentionally not swept. Run `bash sensitivity_studies/scripts/run_all.sh` to reproduce everything; see `sensitivity_studies/README.md` for full methodology and findings (e.g. starting material is the dominant factor in this search space, while `exploration_constant`/`selection_mode` show no measurable effect for a specific, explained structural reason).
-
-## Algorithm Details
-
-### MCTS Loop
-
-1. **Selection Phase**: Start at root, traverse tree picking one child at each level according to `--selection-mode` (default `ucb1`) - see [Child Selection Methods](#child-selection-methods)
-
-2. **Expansion Phase**: When reaching a leaf node, create child nodes by:
-   - Substituting transition metals (move ±1 period or ±1 group)
-   - Substituting Group IV elements (Si → Ge → Sn → Pb)
-   - Substituting f-block elements (based on f-block mode)
-
-3. **Simulation Phase**: Perform rollout simulations:
-   - Evaluate current node (depth=0)
-   - Perform random substitutions for additional rollouts (depth>0)
-   - Calculate reward based on rollout method (`ehull`, `ehull_rdos`, or `rdos`)
-
-4. **Backpropagation Phase**: Update all nodes in selection chain:
-   - Add reward to total_reward
-   - Increment visit count
-   - Update best_reward if improved
-
-### Termination Criteria
-
-Search terminates when:
-- All iterations completed, OR
-- All leaf nodes marked as terminated (visited `--termination-limit` times without improvement, default 60)
-
-### Child Selection Methods
-
-`--selection-mode` controls how a child is picked at each level of the tree during the selection phase. In all modes, `N` is a node's visit count, `Q` is its mean reward (`total_reward / N`), and a terminated child is never selected. `c` is `--exploration-constant`.
-
-- **`ucb1` (default)**: Classic UCB1 - deterministic, always picks the child maximizing
-  ```
-  UCB1 = Q + c * sqrt(ln(N_parent) / N)
-  ```
-  An unvisited child (`N=0`) has `UCB1 = +inf`, so unvisited children are always tried before any visited one. This is the standard MCTS/UCT selection rule: there is no extra randomization beyond what the formula itself provides - the exploration/exploitation tradeoff comes entirely from how the bonus term shrinks as `N` grows.
-
-- **`epsilon_greedy`**: Textbook epsilon-greedy. With probability `1 - epsilon`, picks `argmax(UCB1)` (identical to `ucb1`); with probability `epsilon` (`--epsilon`, default 0.2), picks a child **uniformly at random**, ignoring UCB1 value entirely.
-
-- **`boltzmann`**: Softmax/Boltzmann exploration. Always stochastic - picks child `i` with probability
-  ```
-  P(i) ∝ exp(UCB1_i / T)
-  ```
-  where `T` is `--temperature` (default 1.0). Lower `T` biases toward greedy `argmax`; higher `T` biases toward uniform random. Unvisited children (`UCB1 = +inf`) are still always explored first.
-
-- **`puct`**: AlphaZero-style PUCT (Predictor + UCB applied to Trees) - deterministic, always picks the child maximizing
-  ```
-  PUCT = Q + c * P(i) * sqrt(N_parent) / (1 + N)
-  ```
-  Since this codebase has no learned policy network to predict `P(i)`, a uniform prior `P(i) = 1 / num_children` is used instead. Unlike `ucb1`, an unvisited child has `Q = 0` rather than `+inf` - its exploration bonus is largest when `N=0` (via the `1/(1+N)` term), which is what drives initial exploration instead of an infinite sentinel value.
-
-- **`hybrid`**: This codebase's original default (previously the hardcoded, unnamed behavior before `--selection-mode` existed). An epsilon-greedy outer loop like `epsilon_greedy`, but the exploratory branch (probability `epsilon`) draws from a roulette wheel weighted by **UCB1-squared** rather than picking uniformly - a child with twice the UCB1 of another gets four times the selection probability in that branch. This is not a standard technique from the MCTS literature; it's kept for backward compatibility and comparison against the four methods above.
-
-## Tips for Effective Use
-
-1. **Get a Materials Project API key** for `ehull` or `ehull_rdos`, and put it in `config.json` (gitignored) rather than passing it on the command line repeatedly
-2. **Use `rdos`** if you don't have a Materials Project API key but do have `doscar_peaks_data_with_U.csv`
-3. **Start with default parameters** to understand baseline behavior
-4. **Use `ehull_rdos`** (the published study's method) for balanced stability + electronic-structure optimization
-5. **Increase `--gamma`** to prioritize electronic structure (rDOS) over hull stability, or `--beta` for the reverse
-6. **Increase iterations** (e.g., 2000-5000) for more thorough exploration
-7. **Use `u_only` mode** for focused uranium materials discovery
-8. **Use `lanthanides_u_extended` mode** for broader, faster lanthanide exploration
-9. **Check energy_above_hull values** - aim for < 0.1 eV/atom for synthesizability
-10. **Monitor iteration progress plots** to assess convergence
-
-## Citation
-
-If you use this code in your research, please cite:
-
-```bibtex
-@software{mcts_materials,
-  title = {PACEHOLDER},
-  author = {PLACEHOLDER},
-  year = {2025},
-  url = {https://github.com/lanl/mcts_materials}
-}
-```
-
-## Contact
-
-[placeholder]
-
-## Acknowledgments
-
-- MACE (Machine Learning Aided Chemical Equilibrium) for energy calculations
-- Materials Project for thermodynamic data
-- ASE (Atomic Simulation Environment) for structure manipulation
+**Testing note (molecule integration):** the molecule unit tests mock the
+`molecule-modifier` API (its real package + model files aren't required for the
+suite). Those mocks assume the documented API shape; a one-time validation pass
+against the real installed `molecule-modifier` is still recommended before
+production use, to confirm argument names and prediction DataFrame columns match.
 
 ## Copyright
 
-© 2025. Triad National Security, LLC. All rights reserved. This program was produced under U.S. Government contract 89233218CNA000001 for Los Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC for the U.S. Department of Energy/National Nuclear Security Administration. All rights in the program are reserved by Triad National Security, LLC, and the U.S. Department of Energy/National Nuclear Security Administration. The Government is granted for itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide license in this material to reproduce, prepare. derivative works, distribute copies to the public, perform publicly and display publicly, and to permit others to do so.(Copyright request O5871).
+© 2026. Triad National Security, LLC. All rights reserved. Produced under U.S.
+Government contract 89233218CNA000001 for Los Alamos National Laboratory.

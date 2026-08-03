@@ -1,0 +1,42 @@
+# Example configuration: molecular search.
+#
+# Run with:
+#   mcts-run --config examples/config_molecule.yaml
+#
+# Requires the [molecule] extra (rdkit) and the molecule-modifier package
+# (with its external model files) for property prediction.
+
+material_type: molecule
+
+mcts:
+  iterations: 500
+  exploration_constant: 0.1
+  termination_limit: 60
+  selection_mode: ucb1
+  rollout_depth: 1
+  n_rollout: 5
+  rollout_aggregation: max      # max (optimistic, discounts extra samples) | mean
+  search_mode: fast             # fast (stop at convergence) | thorough (full budget)
+  seed: 0
+  output_dir: mcts_results_molecule
+
+molecule:
+  starting_smiles: "CCO"        # ethanol as a starting point
+  functional_groups:            # SMILES fragments to attach during expansion
+    - "C"                       # methyl
+    - "CC"                      # ethyl
+    - "O"                       # hydroxyl
+    - "N"                       # amino
+
+  objective: melting_point      # melting_point | h2_capacity | synthesizability
+                                # | multi_objective
+  # For objective: multi_objective, provide weights instead, e.g.:
+  # objective: multi_objective
+  # objective_weights:
+  #   h2_capacity: 1.0
+  #   melting_point: 0.5
+  #   synthesizability: 0.3
+
+  # Optional external model directories (else auto-detected by molecule-modifier):
+  chemprop_model_dir: null
+  xgboost_model_dir: null
