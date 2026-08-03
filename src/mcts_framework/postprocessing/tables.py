@@ -18,7 +18,12 @@ import pandas as pd
 
 from ..core.config import Config
 from ..intermetallic import ehull_reward
-from .design_space import full_formula_key, rank_design_space, score_by_method
+from .design_space import (
+    full_formula_key,
+    load_design_space,
+    rank_design_space,
+    score_by_method,
+)
 
 
 def _elem_set(name) -> set:
@@ -47,6 +52,25 @@ def _load_attempted_sets(attempted_path: Optional[str]) -> List[set]:
         return []
 
 
+def _latex_formula(name: str) -> str:
+    """
+    Render a compound name with LaTeX count subscripts, U first then alphabetical.
+
+    e.g. 'Sn6Ti6U' -> 'UTi$_{6}$Sn$_{6}$'. Strips any '|SG|Wyckoff' identifier
+    suffix first. Order (U-first) matches the original product-mode tables.
+    """
+    formula = str(name).split("|")[0]
+    counts: dict = {}
+    for elem, count in re.findall(r"([A-Z][a-z]?)(\d*)", formula):
+        if elem:
+            counts[elem] = counts.get(elem, 0) + (int(count) if count else 1)
+    ordered = []
+    if "U" in counts:
+        ordered.append(("U", counts.pop("U")))
+    ordered.extend(sorted(counts.items()))
+    return "".join(e if c == 1 else f"{e}$_{{{c}}}$" for e, c in ordered)
+
+
 def write_top_n_table(
     df: pd.DataFrame,
     out_path: str,
@@ -57,6 +81,7 @@ def write_top_n_table(
     study_label: str = "",
     key_fn: Callable[[str], Hashable] = full_formula_key,
     space_filter: Optional[Callable[[str], bool]] = None,
+    latex_names: bool = False,
 ) -> str:
     """
     Write a LaTeX table of the top-`n` compounds from a run's results.
@@ -85,6 +110,9 @@ def write_top_n_table(
         space_filter: predicate selecting which compounds form the ranking
             design space. Default None ranks against every compound in the MACE
             cache; pass a predicate (e.g. a U-only filter) to restrict it.
+        latex_names: if True, render the Compound column with LaTeX count
+            subscripts (U first), e.g. 'UTi$_6$Sn$_6$'; default False writes the
+            plain formula.
 
     Returns:
         The path written (str).
@@ -110,10 +138,20 @@ def write_top_n_table(
     # Recompute r_DOS, r_ehull, and the run's reward from the config's method so
     # the table always agrees with the run (rather than trusting a pre-existing
     # score column that may have used a different formula).
+    #
+    # r_DOS is recovered self-sufficiently: prefer an existing r_DOS/dos_reward
+    # column, else look it up per-compound from the run's DOSCAR data (the same
+    # lookup the search uses). Without this fallback, calling this function on a
+    # tree-derived df with no r_DOS column would silently score every compound
+    # with r_DOS=0 - zeroing any rDOS-dependent reward. The name may be a full
+    # "formula|SG|Wyckoff" identifier, so the lookup splits on "|".
     if "r_DOS" not in df.columns and "dos_reward" in df.columns:
         df["r_DOS"] = df["dos_reward"]
     if "r_DOS" not in df.columns:
-        df["r_DOS"] = 0.0
+        _, doscar_lookup = load_design_space(mace_cache, doscar_peaks)
+        df["r_DOS"] = df["name"].apply(
+            lambda n: doscar_lookup.get_reward(str(n).split("|")[0])
+        )
     df["ehull_reward"] = df["e_above_hull"].apply(ehull_reward)
     df["reward"] = df.apply(
         lambda r: score_by_method(
@@ -135,21 +173,25 @@ def write_top_n_table(
     rows = []
     for rank, (_, r) in enumerate(top.iterrows(), start=1):
         name = r.get("name", r.get("formula", ""))
-        es = _elem_set(name)
+        # Strip any "|SG|Wyckoff" identifier suffix before element-set matching
+        # so 'SG'/Wyckoff letters aren't read as spurious elements (which would
+        # break the synthesized/attempted match). full_formula_key strips it too.
+        formula = str(name).split("|")[0]
+        es = _elem_set(formula)
         if any(es == s for s in synth_sets):
             synth = "Yes"
         elif any(es == s for s in attempted_sets):
             synth = "No"
         else:
-            synth = "-"
+            synth = "--"
         rows.append((
             rank,
             global_ranks.get(key_fn(name)),
-            str(name),
-            float(r.get("r_DOS", 0.0) or 0.0),
-            float(r.get("ehull_reward", 0.0) or 0.0),
-            float(r.get("reward", 0.0) or 0.0),
+            _latex_formula(name) if latex_names else formula,
             float(r.get("e_above_hull", np.nan)),
+            float(r.get("ehull_reward", 0.0) or 0.0),
+            float(r.get("r_DOS", 0.0) or 0.0),
+            float(r.get("reward", 0.0) or 0.0),
             synth,
         ))
 
@@ -164,13 +206,14 @@ def write_top_n_table(
                 f"{len(global_ranks)}-compound {space_desc} design space.\n")
         f.write("\\begin{tabular}{rrlrrrrc}\n")
         f.write("\\toprule\n")
-        f.write("MCTS Rank & True Rank & Name & $r_{\\mathrm{DOS}}$ & "
-                "$r_{E_{\\mathrm{Hull}}}$ & Reward & E\\_hull & Synth" + eol)
+        f.write("MCTS Rank & True Rank & Compound & $E_{\\mathrm{Hull}}$ & "
+                "$r_{E_{\\mathrm{Hull}}}$ & $r_{\\mathrm{DOS}}$ & Reward & "
+                "Synthesized?" + eol)
         f.write("\\midrule\n")
-        for rank, gr, name, rdos, ehull_r, reward, ehull, synth in rows:
+        for rank, gr, name, ehull, ehull_r, rdos, reward, synth in rows:
             gr_s = str(gr) if gr is not None else "--"
-            f.write(f"{rank} & {gr_s} & {name} & {rdos:.4f} & {ehull_r:.4f} & "
-                    f"{reward:.4f} & {ehull:.4f} & {synth}" + eol)
+            f.write(f"{rank} & {gr_s} & {name} & {ehull:.4f} & {ehull_r:.4f} & "
+                    f"{rdos:.1f} & {reward:.2f} & {synth}" + eol)
         f.write("\\bottomrule\n")
         f.write("\\end{tabular}\n")
     return str(out)

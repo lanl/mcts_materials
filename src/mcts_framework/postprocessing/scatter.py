@@ -62,6 +62,7 @@ def plot_ehull_vs_rdos(
     space_filter: Optional[Callable[[str], bool]] = None,
     synthesized: Optional[Sequence[str]] = None,
     attempted_path: Optional[str] = None,
+    ymax: Optional[float] = None,
 ):
     """
     Scatter E_hull vs r_DOS: full design space (backdrop) + run top-N.
@@ -88,6 +89,10 @@ def plot_ehull_vs_rdos(
         synthesized: dash- or plain-form names known synthesized (filled square).
         attempted_path: compounds_filtered.dat path; attempted-but-not-
             synthesized compounds get an open square.
+        ymax: optional upper E_hull limit. Default None shows the full data
+            range; pass e.g. 1.5 for a tight publication view that excludes the
+            E_hull=UnstablePenalty outliers (no_mp_data/error compounds) which
+            otherwise compress the near-zero region.
 
     Returns:
         The matplotlib Figure, or None if there is no design-space data to plot.
@@ -121,8 +126,9 @@ def plot_ehull_vs_rdos(
     space["x"] = space["r_dos"].astype(float)
     space["y"] = space["e_above_hull"].astype(float)
 
-    fig, ax = plt.subplots(figsize=(4, 4))
-    ax.scatter(space["x"], space["y"], s=6, color="#D0D0D0", label="All compounds")
+    fig, ax = plt.subplots(figsize=(3, 3))
+    ax.scatter(space["x"], space["y"], s=5, color="#D0D0D0", linewidths=0,
+               label="All compounds")
 
     # Backdrop lookup: key -> (x, y), for matching overlays across name orderings.
     backdrop = {}
@@ -172,28 +178,33 @@ def plot_ehull_vs_rdos(
         if hit is not None:
             xs.append(hit[0]); ys.append(hit[1])
     if xs:
-        ax.scatter(xs, ys, s=45, color="#5BC0EB", marker="^", edgecolors="none",
-                   alpha=0.65, label=f"Top {top_n} (MCTS)")
+        ax.scatter(xs, ys, s=30, color="#5BC0EB", marker="^", edgecolors="none",
+                   alpha=0.55, label=f"Top {top_n} (MCTS)")
 
-    ax.set_xlabel(r"$r_{\mathrm{DOS}}$")
-    ax.set_ylabel(r"$E_{\mathrm{Hull}}$ (eV/atom)")
+    ax.set_xlabel(r"$r_{\mathrm{DOS}}$", fontsize=9)
+    ax.set_ylabel(r"$E_{\mathrm{Hull}}$ (eV/atom)", fontsize=9)
     ax.axhline(0, color="k", linestyle="--", linewidth=0.8)
+    if ymax is not None:
+        ax.set_ylim(top=ymax)
+    ax.tick_params(labelsize=8)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
     handles = [
         Line2D([0], [0], marker="o", linestyle="None", markerfacecolor="#D0D0D0",
-               markeredgecolor="#D0D0D0", markersize=6, label="All compounds"),
+               markeredgecolor="#D0D0D0", markersize=5, label="All compounds"),
         Line2D([0], [0], marker="^", linestyle="None", markerfacecolor="#5BC0EB",
-               markeredgecolor="none", markersize=8, label=f"Top {top_n} (MCTS)"),
+               markeredgecolor="none", markersize=7, label=f"Top {top_n} (MCTS)"),
     ]
     if unsucc_x:
         handles.append(Line2D([0], [0], marker="s", linestyle="None",
                        markerfacecolor="none", markeredgecolor="#9467bd",
-                       markersize=8, label="Unsuccessful synthesis"))
+                       markersize=7, label="Unsuccessful synthesis"))
     if succ_x:
         handles.append(Line2D([0], [0], marker="s", linestyle="None",
                        markerfacecolor="#9467bd", markeredgecolor="#9467bd",
-                       markersize=9, label="Successful synthesis"))
-    ax.legend(handles=handles, fontsize=8)
+                       markersize=7, label="Successful synthesis"))
+    ax.legend(handles=handles, fontsize=7, frameon=False)
     fig.tight_layout()
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)

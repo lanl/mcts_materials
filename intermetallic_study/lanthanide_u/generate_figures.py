@@ -12,7 +12,6 @@ Usage:
 """
 
 import argparse
-import re
 import sys
 from pathlib import Path
 
@@ -20,9 +19,16 @@ import pandas as pd
 
 from mcts_framework.postprocessing import (
     load_run_config,
-    plot_ehull_vs_rdos_product_lanthanide_u,
-    write_product_mode_table,
-    write_product_mode_txt_table,
+    plot_ehull_vs_rdos,
+    write_top_n_table,
+)
+
+# Study-specific helpers live alongside the drivers (not in the library).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _study_figures import (  # noqa: E402
+    experimental_overlay_points,
+    lanthanide_u_filter,
+    write_txt_table,
 )
 
 
@@ -117,13 +123,30 @@ def main():
             config.intermetallic.doscar_data_path = str(repo_root / config.intermetallic.doscar_data_path)
 
     try:
-        plot_ehull_vs_rdos_product_lanthanide_u(
+        # Base scatter from the generic library (design-space backdrop +
+        # top-N overlay, lanthanide+U filtered), then add the study-specific
+        # experimental-literature red diamonds onto the returned axes.
+        fig = plot_ehull_vs_rdos(
+            run_df=results_df,
             out_path=str(scatter_path),
             config=config,
-            experimental_path=str(experimental_path) if experimental_path.exists() else None,
             top_n=args.top_n,
-            run_df=results_df,
+            space_filter=lanthanide_u_filter,
+            ymax=1.5,
         )
+        if fig is not None and experimental_path.exists() and config.intermetallic:
+            exp_x, exp_y = experimental_overlay_points(
+                str(experimental_path),
+                config.intermetallic.cache_path,
+                config.intermetallic.doscar_data_path,
+            )
+            if exp_x:
+                ax = fig.axes[0]
+                ax.scatter(exp_x, exp_y, s=28, color="#E84855", marker="D",
+                           edgecolors="none", alpha=0.8, zorder=3,
+                           label="Experimental literature")
+                ax.legend(fontsize=7, frameon=False)
+                fig.savefig(str(scatter_path), dpi=300, bbox_inches="tight")
     except Exception as e:
         print(f"ERROR generating scatter plot: {e}")
         import traceback
@@ -133,33 +156,23 @@ def main():
 
     print()
 
-    # Helper function for lanthanide+U filter
-    def _lanthanide_u_filter(name: str) -> bool:
-        """True if compound contains U or any lanthanide."""
-        lanthanides = {'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu'}
-        elems = set(re.findall(r'[A-Z][a-z]?', str(name)))
-        return 'U' in elems or bool(elems & lanthanides)
-
     # Generate top-15 tables
     print("Generating top-15 tables...")
     tables_dir = figures_dir / "tables"
     tables_dir.mkdir(exist_ok=True)
 
-    # No synthesized compounds list for lanthanide+U (experimental data used instead)
-    synthesized = []
-
-    # LaTeX table
+    # LaTeX table (generic library; lanthanide+U design space, LaTeX names).
+    # No synthesized list for lanthanide+U (experimental data is used instead).
     tex_path = tables_dir / "top15_lanthanide_u_product.tex"
     try:
-        write_product_mode_table(
+        write_top_n_table(
             df=results_df,
             out_path=str(tex_path),
             config=config,
             n=15,
-            synthesized=synthesized,
-            attempted_path=None,
             study_label="lanthanide+U",
-            space_filter=_lanthanide_u_filter,
+            space_filter=lanthanide_u_filter,
+            latex_names=True,
         )
         print(f"  Saved: {tex_path.name}")
     except Exception as e:
@@ -167,18 +180,16 @@ def main():
         import traceback
         traceback.print_exc()
 
-    # Plain text table
+    # Plain text table (study-local helper).
     txt_path = study_dir / "top15_recommendations.txt"
     try:
-        write_product_mode_txt_table(
+        write_txt_table(
             df=results_df,
             out_path=str(txt_path),
             config=config,
             n=15,
-            synthesized=synthesized,
-            attempted_path=None,
             study_label="lanthanide+U",
-            space_filter=_lanthanide_u_filter,
+            space_filter=lanthanide_u_filter,
         )
         print(f"  Saved: {txt_path.name}")
     except Exception as e:

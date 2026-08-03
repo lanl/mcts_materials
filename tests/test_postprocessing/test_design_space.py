@@ -131,6 +131,27 @@ class TestRankDesignSpace:
         ranks = rank_design_space("/no/such/file.csv", DOSCAR_PEAKS, "ehull_rdos")
         assert ranks == {}
 
+    def test_data_quality_penalty_sinks_flagged_compounds(self, tmp_path):
+        # Regression: rank_design_space must apply the same UnstablePenalty the
+        # search uses for no_mp_data/error compounds, so a compound with a
+        # good-looking raw e_hull but flagged data quality ranks LAST, not first.
+        import pandas as pd
+        from mcts_framework.intermetallic import UnstablePenalty
+
+        cache = tmp_path / "cache.csv"
+        pd.DataFrame({
+            # 'Flagged' has the best raw e_hull but is no_mp_data -> penalized.
+            "name": ["Fe6Ge6U", "Co6Ge6U", "Ni6Ge6U"],
+            "e_above_hull": [-0.20, 0.02, 0.03],
+            "data_quality": ["no_mp_data", "valid", "valid"],
+        }).to_csv(cache, index=False)
+
+        ranks = rank_design_space(str(cache), DOSCAR_PEAKS, "ehull")
+        assert UnstablePenalty == 10.0  # guards the constant we rank against
+        # The flagged compound is penalized to e_hull=10 -> worst rank, despite
+        # its -0.20 raw e_hull that would otherwise put it first.
+        assert ranks[full_formula_key("Fe6Ge6U")] == max(ranks.values())
+
 
 @requires_data
 class TestLoadDesignSpace:

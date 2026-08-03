@@ -7,6 +7,8 @@ periodic-table navigation matches the validated mcts_crystal behavior.
 © 2025. Triad National Security, LLC. All rights reserved.
 """
 
+import pytest
+
 from mcts_framework.intermetallic import elements
 
 
@@ -192,3 +194,39 @@ def test_classify_site():
     assert elements.classify_site(92) == "f_block"    # U
     assert elements.classify_site(64) == "f_block"    # Gd
     assert elements.classify_site(1) is None          # H - not a site
+
+
+# --- validate_fblock_compat (relocated from the config validator) --------
+
+# Representative Pb6U1W6 / Cr6Sn6Tb compositions as atomic-number lists
+# (the helper is pure over atomic numbers, so no CIF/ASE needed).
+_U_ATOMS = [92] + [82] * 6 + [74] * 6          # U, Pb x6, W x6
+_TB_ATOMS = [65] + [24] * 6 + [50] * 6         # Tb, Cr x6, Sn x6
+
+
+def test_fblock_compat_u_only_accepts_u():
+    assert elements.validate_fblock_compat(_U_ATOMS, "u_only") == []
+
+
+def test_fblock_compat_u_only_rejects_no_u():
+    # u_only with a lanthanide (Tb) and no U must raise - this check used to be
+    # silently skipped when the CIF was absent; now it always runs.
+    with pytest.raises(ValueError, match="requires U"):
+        elements.validate_fblock_compat(_TB_ATOMS, "u_only")
+
+
+def test_fblock_compat_lanthanides_u_accepts_tb():
+    assert elements.validate_fblock_compat(_TB_ATOMS, "lanthanides_u") == []
+
+
+def test_fblock_compat_lanthanides_u_rejects_actinide():
+    # Th (90) is an actinide, not allowed under lanthanides_u.
+    th_atoms = [90] + [24] * 6 + [50] * 6
+    with pytest.raises(ValueError, match="lanthanides"):
+        elements.validate_fblock_compat(th_atoms, "lanthanides_u")
+
+
+def test_fblock_compat_warns_when_no_fblock():
+    # No f-block element at all -> a warning message (not an error).
+    warnings_out = elements.validate_fblock_compat([24] * 6 + [50] * 6, "u_only")
+    assert warnings_out and "No f-block" in warnings_out[0]

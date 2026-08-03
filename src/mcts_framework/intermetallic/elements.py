@@ -200,3 +200,50 @@ def classify_site(atomic_num: int) -> Optional[str]:
     if 22 <= atomic_num <= 30 or 40 <= atomic_num <= 48 or 72 <= atomic_num <= 80:
         return "metal"
     return None
+
+
+def validate_fblock_compat(atomic_numbers, f_block_mode: str) -> List[str]:
+    """
+    Check that a starting structure's f-block element(s) are compatible with
+    f_block_mode, and return a list of non-fatal warning messages.
+
+    Pure function over an iterable of atomic numbers (extracted from the loaded
+    structure by the caller) - no file I/O, so config validation stays cheap and
+    the check is unit-testable without ASE. Raises ValueError on a hard
+    incompatibility (e.g. u_only without U); returns warning strings for the
+    caller to emit (e.g. u_only with extra f-block elements, or no f-block at
+    all). U is atomic number 92; lanthanides are La(57)-Lu(71).
+    """
+    f_block = {int(z) for z in atomic_numbers if int(z) in F_BLOCK_ELEMENTS}
+    warnings_out: List[str] = []
+
+    if not f_block:
+        warnings_out.append(
+            "No f-block elements found in the starting structure. The search "
+            "will not explore f-block substitutions."
+        )
+        return warnings_out
+
+    if f_block_mode == "u_only":
+        if 92 not in f_block:
+            raise ValueError(
+                f"f_block_mode='u_only' requires U (atomic number 92) in the "
+                f"starting structure, but found f-block elements: {sorted(f_block)}"
+            )
+        if len(f_block) > 1:
+            warnings_out.append(
+                f"f_block_mode='u_only' found multiple f-block elements "
+                f"{sorted(f_block)} in the starting structure. Only U (92) will "
+                f"participate in moves."
+            )
+    elif f_block_mode in ("lanthanides_u", "lanthanides_u_no_wrap"):
+        valid = set(range(57, 72)) | {92}  # La-Lu + U
+        invalid = f_block - valid
+        if invalid:
+            raise ValueError(
+                f"f_block_mode='{f_block_mode}' requires lanthanides (La-Lu, "
+                f"57-71) or U (92), but found: {sorted(invalid)}"
+            )
+    # full_f_block: every f-block element is valid; no check needed.
+
+    return warnings_out

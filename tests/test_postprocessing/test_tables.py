@@ -93,14 +93,79 @@ class TestWriteTopNTable:
         expected = score_by_method("ehull_rdos_product", best.e_above_hull, best.dos_reward)
         body = [ln for ln in Path(out).read_text().splitlines()
                 if "&" in ln and "MCTS Rank" not in ln]
-        reward_cell = float(body[0].split("&")[5])
-        assert reward_cell == pytest.approx(expected, abs=1e-4)
+        # Columns: rank & true & compound & E_hull & r_ehull & r_DOS & Reward & synth
+        reward_cell = float(body[0].split("&")[6])
+        assert reward_cell == pytest.approx(expected, abs=1e-2)  # Reward printed .2f
+
+    def test_latex_names_renders_subscripts(self, tmp_path):
+        cfg = _make_config()
+        plain = write_top_n_table(_sample_df(), str(tmp_path / "plain.tex"), cfg, n=3)
+        latex = write_top_n_table(_sample_df(), str(tmp_path / "latex.tex"), cfg,
+                                  n=3, latex_names=True)
+        assert "$_{6}$" not in Path(plain).read_text()
+        # LaTeX names use count subscripts and put U first (e.g. UFe$_{6}$Ge$_{6}$).
+        latex_text = Path(latex).read_text()
+        assert "$_{6}$" in latex_text
+        assert "UFe$_{6}$Ge$_{6}$" in latex_text  # from Fe6Ge6U
 
     def test_missing_data_paths_raise(self, tmp_path):
         cfg = _make_config()
         cfg.intermetallic.cache_path = None
         with pytest.raises(ValueError, match="cache_path"):
             write_top_n_table(_sample_df(), str(tmp_path / "x.tex"), cfg, n=3)
+
+    def test_rdos_recovered_from_doscar_when_column_absent(self, tmp_path):
+        # Regression: a tree-derived df has no r_DOS/dos_reward column and its
+        # 'name' may be a full 'formula|SG|Wyckoff' identifier. The table must
+        # recover r_DOS from the run's DOSCAR data (splitting on '|'), not treat
+        # it as 0 (which would zero every rDOS-dependent reward). Uses U-only
+        # compounds known to have DOSCAR entries.
+        from mcts_framework.postprocessing import load_design_space
+
+        cfg = _make_config()  # ehull_rdos_product
+        _, lookup = load_design_space(MACE_CACHE, DOSCAR_PEAKS)
+        # A df with NO r_DOS column and identifier-style names.
+        df = pd.DataFrame({
+            "name": ["Cr6Sn6U|SG191|a", "Fe6Ge6U|SG191|b"],
+            "e_above_hull": [0.02, 0.01],
+        })
+        out = write_top_n_table(df, str(tmp_path / "r.tex"), cfg, n=2)
+        body = [ln for ln in Path(out).read_text().splitlines()
+                if "&" in ln and "MCTS Rank" not in ln]
+        # Columns: rank & true & compound & E_hull & r_ehull & r_DOS & Reward & synth
+        # r_DOS is column index 5, printed .1f.
+        rdos_cells = [float(ln.split("&")[5]) for ln in body]
+        assert all(v > 0 for v in rdos_cells), f"r_DOS not recovered: {rdos_cells}"
+        # And it must match the DOSCAR lookup on the plain formula.
+        assert rdos_cells[0] == pytest.approx(
+            max(lookup.get_reward("Cr6Sn6U"), lookup.get_reward("Fe6Ge6U")), abs=0.1
+        )
+
+    def test_identifier_names_resolve_true_rank_and_synth(self, tmp_path):
+        # Regression: with 'formula|SG|Wyckoff' identifier names, the True Rank
+        # lookup and synthesized/attempted matching must strip the suffix (not
+        # read 'SG'/Wyckoff letters as elements). Previously True Rank came out
+        # '--' and synth never matched for identifier-named rows.
+        cfg = _make_config()  # full-space ranking (space_filter=None)
+        df = pd.DataFrame({
+            "name": ["Fe6Ge6U|SG191|Fe6i-Ge2c-U1a", "Co6Sn6U|SG191|x"],
+            "e_above_hull": [0.01, 0.02],
+        })
+        # 'Fe6Ge6U' as a dash-form synthesized entry must match despite the suffix.
+        out = write_top_n_table(df, str(tmp_path / "id.tex"), cfg, n=2,
+                                synthesized=["U-Ge-Fe"])
+        body = [ln for ln in Path(out).read_text().splitlines()
+                if "&" in ln and "MCTS Rank" not in ln]
+        rows = [[c.strip() for c in ln.rstrip(" \\").split("&")] for ln in body]
+        # Every row: True Rank (col 1) resolves to a real integer, not '--';
+        # Compound (col 2) is the plain formula with no '|' suffix.
+        for cols in rows:
+            assert cols[1] != "--" and int(cols[1]) >= 1
+            assert "|" not in cols[2]
+        # The Fe6Ge6U row matches the U-Ge-Fe synthesized entry (col -1 'Yes'),
+        # proving suffix-stripped element-set matching.
+        fe_row = next(c for c in rows if c[2] == "Fe6Ge6U")
+        assert fe_row[-1] == "Yes"
 
 
 class TestConfigDumpYaml:
