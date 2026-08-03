@@ -190,7 +190,7 @@ async def test_evaluator_caches_repeated_materials():
     assert evaluator.compute_calls == len(evaluator.cache)
 
 
-# --- Rollout discount ----------------------------------------------------
+# --- Rollout depth -------------------------------------------------------
 
 
 @pytest.mark.asyncio

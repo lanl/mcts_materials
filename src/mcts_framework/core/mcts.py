@@ -84,14 +84,13 @@ class MCTS(Generic[M]):
                 including the mandatory depth-0 sample.
             rollout_aggregation: How to combine a node's n_rollout reward
                 samples into its value:
-                - 'max' (default): optimistic maximum. The extra (depth>0)
-                  samples are discounted by 0.9**rollout_depth before
-                  comparison, acting as a confidence penalty on speculative
-                  lookahead relative to the node's own depth-0 reward.
-                - 'mean': plain average of UNDISCOUNTED samples, an unbiased
-                  estimate of expected reward. The depth discount is dropped
-                  here (discounting-then-averaging-by-unweighted-n would just
-                  drag the mean toward zero rather than weight confidence).
+                - 'max' (default): optimistic maximum - the node's value is
+                  the best reward reachable within rollout_depth random steps.
+                - 'mean': plain average of the samples, an unbiased estimate
+                  of expected reward.
+                Samples are undiscounted in both cases: evaluations here are
+                deterministic (cached energies + DOSCAR lookup), so there is no
+                sampling noise to hedge against.
             search_mode: When the run stops.
                 - 'fast' (default): stop as soon as the ROOT node self-
                   terminates via its visits-without-improvement countdown
@@ -348,14 +347,16 @@ class MCTS(Generic[M]):
         samples are random "max-along-walk" rollouts (see _rollout_sample).
 
         The samples are combined per self.rollout_aggregation:
-        - 'max': the extra samples are discounted by 0.9**rollout_depth (a
-          confidence penalty on speculative lookahead), then the maximum over
-          all samples is taken.
-        - 'mean': the extra samples are left undiscounted and the plain mean
-          over all samples is returned (unbiased expected-reward estimate).
+        - 'max': the maximum over all samples (the best reward reachable within
+          rollout_depth random steps).
+        - 'mean': the plain mean over all samples (unbiased expected-reward
+          estimate).
+
+        Samples are undiscounted: evaluations are deterministic (cached energies
+        + DOSCAR lookup), so there is no sampling noise to hedge against.
 
         The returned value is what backpropagation propagates; node.own_reward
-        is always the undiscounted depth-0 reward regardless of aggregation.
+        is always the depth-0 reward regardless of aggregation.
         """
         # Depth-0 sample: evaluate the node itself and cache its properties.
         base_props = await self.property_evaluator.evaluate(node.material)
@@ -364,11 +365,8 @@ class MCTS(Generic[M]):
         node.own_reward = own
 
         samples = [own]
-
-        # 'max' discounts the extra samples; 'mean' leaves them undiscounted.
-        scale = 0.9 ** self.rollout_depth if self.rollout_aggregation == "max" else 1.0
         for _ in range(self.n_rollout - 1):
-            samples.append(scale * await self._rollout_sample(node.material))
+            samples.append(await self._rollout_sample(node.material))
 
         if self.rollout_aggregation == "max":
             return max(samples)
@@ -388,8 +386,7 @@ class MCTS(Generic[M]):
 
         Rollout samples are NOT added to the tree and do NOT reserve
         identifiers - they only probe reward, so their materials remain
-        available for real expansion later. The depth discount (for 'max'
-        aggregation) is applied by the caller, not here.
+        available for real expansion later.
         """
         current = material
         step_rewards: List[float] = []
