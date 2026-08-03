@@ -80,10 +80,14 @@ class MCTS(Generic[M]):
                 is marked terminated.
             rollout_depth: Number of random substitution steps per rollout
                 sample beyond the node itself (depth 0 = evaluate the node).
-            n_rollout: Total rollout samples per newly expanded node,
-                including the mandatory depth-0 sample.
-            rollout_aggregation: How to combine a node's n_rollout reward
-                samples into its value:
+            n_rollout: Number of random rollout walks per newly expanded node.
+                These are in ADDITION to the mandatory depth-0 self-evaluation,
+                so a node is aggregated over n_rollout+1 samples. n_rollout=1
+                means one lookahead walk is drawn (n_rollout=0 disables
+                lookahead entirely -> value is just the node's own reward).
+            rollout_aggregation: How to combine a node's reward samples (the
+                depth-0 self-evaluation plus n_rollout walk samples) into its
+                value:
                 - 'max' (default): optimistic maximum - the node's value is
                   the best reward reachable within rollout_depth random steps.
                 - 'mean': plain average of the samples, an unbiased estimate
@@ -124,7 +128,7 @@ class MCTS(Generic[M]):
         self.exploration_constant = exploration_constant
         self.termination_limit = termination_limit
         self.rollout_depth = rollout_depth
-        self.n_rollout = max(1, n_rollout)
+        self.n_rollout = max(0, n_rollout)
         self.rollout_aggregation = rollout_aggregation
         self.search_mode = search_mode
 
@@ -339,12 +343,13 @@ class MCTS(Generic[M]):
 
     async def _simulate(self, node: SearchNode[M]) -> float:
         """
-        Estimate the value of `node` by aggregating n_rollout reward samples.
+        Estimate the value of `node` by aggregating its reward samples.
 
         Sample 0 always evaluates the node itself (depth 0), records its
         properties, and sets node.own_reward (the node's true material value,
-        which stays independent of aggregation). The remaining n_rollout-1
-        samples are random "max-along-walk" rollouts (see _rollout_sample).
+        which stays independent of aggregation). n_rollout further samples are
+        random "max-along-walk" rollouts (see _rollout_sample), so the node is
+        aggregated over n_rollout+1 samples in total.
 
         The samples are combined per self.rollout_aggregation:
         - 'max': the maximum over all samples (the best reward reachable within
@@ -365,7 +370,7 @@ class MCTS(Generic[M]):
         node.own_reward = own
 
         samples = [own]
-        for _ in range(self.n_rollout - 1):
+        for _ in range(self.n_rollout):
             samples.append(await self._rollout_sample(node.material))
 
         if self.rollout_aggregation == "max":

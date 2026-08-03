@@ -70,7 +70,11 @@ class MCTSConfig(BaseModel):
     )
 
     rollout_depth: int = Field(1, ge=0, description="Random steps per rollout sample")
-    n_rollout: int = Field(5, ge=1, description="Rollout samples per expansion")
+    n_rollout: int = Field(
+        5, ge=0,
+        description="Random lookahead walks per expansion, additional to the "
+        "node's own evaluation (0 = no lookahead; value is the node's reward)",
+    )
     rollout_aggregation: Literal["max", "mean"] = Field(
         "max",
         description="Combine a node's n_rollout samples: 'max' (optimistic; "

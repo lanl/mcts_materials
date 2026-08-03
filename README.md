@@ -229,8 +229,12 @@ The intermetallic rewards preserve the validated constants from `mcts_crystal`:
   lanthanide/U modes — `narrow` (Nd only, default) or `wide` (Nd/Gd/Er).
   `move_step` (jump distance) and `u_bridge` (U connectivity) are orthogonal;
   together they replace the old conflated `lanthanides_u_extended` mode.
-- **`rollout_aggregation`** (core): how a node's `n_rollout` samples combine —
-  `max` (default; best reward reachable within `rollout_depth` steps) or `mean`
+- **`n_rollout`** (core): number of random lookahead walks drawn per expanded
+  node, *in addition* to the node's own depth-0 evaluation (so a node is scored
+  over `n_rollout + 1` samples). `n_rollout=1` draws one walk; `n_rollout=0`
+  disables lookahead (value is just the node's own reward).
+- **`rollout_aggregation`** (core): how a node's samples combine — `max`
+  (default; best reward reachable within `rollout_depth` steps) or `mean`
   (unbiased average). Samples are undiscounted (evaluations are deterministic).
 - **max-along-walk rollouts**: a depth>0 rollout scores every composition along
   the random walk and returns the max, extracting up to `rollout_depth`
