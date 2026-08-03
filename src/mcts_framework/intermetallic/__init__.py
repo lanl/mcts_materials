@@ -18,7 +18,7 @@ from .rewards import (
     ehull_reward,
     create_intermetallic_reward,
 )
-from .evaluator import MaceEvaluator
+from .evaluator import MaceEvaluator, UnstablePenalty
 
 __all__ = [
     "IntermetallicStructure",
@@ -31,4 +31,5 @@ __all__ = [
     "ehull_reward",
     "create_intermetallic_reward",
     "MaceEvaluator",
+    "UnstablePenalty",
 ]
