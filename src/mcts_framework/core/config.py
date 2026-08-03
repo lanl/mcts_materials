@@ -77,9 +77,10 @@ class MCTSConfig(BaseModel):
     )
     rollout_aggregation: Literal["max", "mean"] = Field(
         "max",
-        description="Combine a node's n_rollout samples: 'max' (optimistic; "
-        "best reward reachable within rollout_depth steps) or 'mean' (unbiased "
-        "average). Samples are undiscounted (deterministic evaluations).",
+        description="Combine a node's reward samples (its own evaluation plus "
+        "n_rollout walks): 'max' (optimistic; best reward reachable within "
+        "rollout_depth steps) or 'mean' (unbiased average). Samples are "
+        "undiscounted (deterministic evaluations).",
     )
     search_mode: Literal["fast", "thorough"] = Field(
         "fast",

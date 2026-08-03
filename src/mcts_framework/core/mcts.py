@@ -349,7 +349,9 @@ class MCTS(Generic[M]):
         properties, and sets node.own_reward (the node's true material value,
         which stays independent of aggregation). n_rollout further samples are
         random "max-along-walk" rollouts (see _rollout_sample), so the node is
-        aggregated over n_rollout+1 samples in total.
+        aggregated over n_rollout+1 samples in total. When rollout_depth == 0
+        the walks are skipped entirely (they could only re-evaluate the node
+        itself), so the value is just node.own_reward.
 
         The samples are combined per self.rollout_aggregation:
         - 'max': the maximum over all samples (the best reward reachable within
@@ -370,8 +372,13 @@ class MCTS(Generic[M]):
         node.own_reward = own
 
         samples = [own]
-        for _ in range(self.n_rollout):
-            samples.append(await self._rollout_sample(node.material))
+        # With rollout_depth == 0 a walk can take no moves and only re-evaluates
+        # the starting material, returning `own` again - so the walks cannot
+        # change the aggregate. Skip them (rollout_depth == 0 means "no
+        # lookahead," same as n_rollout == 0).
+        if self.rollout_depth > 0:
+            for _ in range(self.n_rollout):
+                samples.append(await self._rollout_sample(node.material))
 
         if self.rollout_aggregation == "max":
             return max(samples)

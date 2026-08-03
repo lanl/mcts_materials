@@ -224,6 +224,28 @@ async def test_n_rollout_counts_walks_not_off_by_one():
         assert walks["n"] == n, f"n_rollout={n} should draw {n} walks, drew {walks['n']}"
 
 
+@pytest.mark.asyncio
+async def test_rollout_depth_zero_skips_walks():
+    """
+    With rollout_depth == 0 a walk can take no moves and only re-evaluates the
+    node itself, so it cannot change the aggregate. _simulate must skip rollout
+    sampling entirely (no _rollout_sample calls) even when n_rollout > 0, and
+    the value is just the node's own reward.
+    """
+    mcts = make_mcts(target=0, start=3, n_rollout=5, rollout_depth=0, seed=0)
+    walks = {"n": 0}
+    orig = mcts._rollout_sample
+
+    async def wrapped(material, _orig=orig, _c=walks):
+        _c["n"] += 1
+        return await _orig(material)
+
+    mcts._rollout_sample = wrapped
+    reward = await mcts._simulate(mcts.root)
+    assert walks["n"] == 0  # no walks drawn despite n_rollout=5
+    assert reward == -3.0   # value is just own_reward (distance 3 -> -3)
+
+
 # --- rollout_aggregation + max-along-walk --------------------------------
 
 
