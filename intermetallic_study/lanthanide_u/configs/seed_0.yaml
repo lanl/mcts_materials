@@ -8,14 +8,14 @@
 material_type: intermetallic
 
 mcts:
-  iterations: 5000
+  iterations: 1000
   exploration_constant: 1.41  # √2 for balanced exploration/exploitation
-  termination_limit: 500
+  termination_limit: 100
   selection_mode: ucb1
-  rollout_depth: 4
+  rollout_depth: 3
   n_rollout: 2
   rollout_aggregation: max
-  search_mode: fast
+  search_mode: thorough
   seed: 0
   output_dir: intermetallic_study/lanthanide_u/results/seed_0
 
@@ -24,7 +24,7 @@ intermetallic:
   transition_metal: Cu
   group_iv: Sn
   f_block_mode: lanthanides_u
-  move_step: 3  # Extended-range moves
+  move_step: 2
   u_bridge: wide
   rollout_method: ehull_rdos_product
   beta: 1.0
