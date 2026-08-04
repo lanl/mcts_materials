@@ -190,7 +190,7 @@ async def test_evaluator_caches_repeated_materials():
     assert evaluator.compute_calls == len(evaluator.cache)
 
 
-# --- Rollout discount ----------------------------------------------------
+# --- Rollout depth -------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -200,6 +200,50 @@ async def test_rollout_depth_zero_is_pure_node_value():
     reward = await mcts._simulate(mcts.root)
     # distance from 3 to target 0 is 3 -> reward -3
     assert reward == -3.0
+
+
+@pytest.mark.asyncio
+async def test_n_rollout_counts_walks_not_off_by_one():
+    """
+    Regression: n_rollout is the number of rollout WALKS drawn, additional to
+    the mandatory depth-0 self-evaluation. n_rollout=1 must draw one walk (the
+    old code ran the loop n_rollout-1 times, so n_rollout=1 drew ZERO walks and
+    rollout_depth was silently ignored). We count _rollout_sample calls.
+    """
+    for n in (0, 1, 3):
+        mcts = make_mcts(target=0, start=5, n_rollout=n, rollout_depth=4, seed=0)
+        walks = {"n": 0}
+        orig = mcts._rollout_sample
+
+        async def wrapped(material, _orig=orig, _c=walks):
+            _c["n"] += 1
+            return await _orig(material)
+
+        mcts._rollout_sample = wrapped
+        await mcts._simulate(mcts.root)
+        assert walks["n"] == n, f"n_rollout={n} should draw {n} walks, drew {walks['n']}"
+
+
+@pytest.mark.asyncio
+async def test_rollout_depth_zero_skips_walks():
+    """
+    With rollout_depth == 0 a walk can take no moves and only re-evaluates the
+    node itself, so it cannot change the aggregate. _simulate must skip rollout
+    sampling entirely (no _rollout_sample calls) even when n_rollout > 0, and
+    the value is just the node's own reward.
+    """
+    mcts = make_mcts(target=0, start=3, n_rollout=5, rollout_depth=0, seed=0)
+    walks = {"n": 0}
+    orig = mcts._rollout_sample
+
+    async def wrapped(material, _orig=orig, _c=walks):
+        _c["n"] += 1
+        return await _orig(material)
+
+    mcts._rollout_sample = wrapped
+    reward = await mcts._simulate(mcts.root)
+    assert walks["n"] == 0  # no walks drawn despite n_rollout=5
+    assert reward == -3.0   # value is just own_reward (distance 3 -> -3)
 
 
 # --- rollout_aggregation + max-along-walk --------------------------------
@@ -382,9 +426,9 @@ async def test_summary_fields():
 async def test_best_node_and_reward_are_consistent():
     """
     Regression (bug #1): the global best_reward must equal best_node's OWN
-    reward, never a discounted rollout sample of a different material. Use
-    rollout_depth>0 and n_rollout>1 so rollout samples are actually drawn -
-    the old code could set best_reward from one of those.
+    reward, never a rollout sample of a different material. Use rollout_depth>0
+    and n_rollout>=1 so rollout samples are actually drawn - the old code could
+    set best_reward from one of those.
     """
     mcts = make_mcts(target=8, start=0, n_rollout=4, rollout_depth=3)
     await mcts.run(iterations=200)

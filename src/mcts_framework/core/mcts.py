@@ -80,18 +80,21 @@ class MCTS(Generic[M]):
                 is marked terminated.
             rollout_depth: Number of random substitution steps per rollout
                 sample beyond the node itself (depth 0 = evaluate the node).
-            n_rollout: Total rollout samples per newly expanded node,
-                including the mandatory depth-0 sample.
-            rollout_aggregation: How to combine a node's n_rollout reward
-                samples into its value:
-                - 'max' (default): optimistic maximum. The extra (depth>0)
-                  samples are discounted by 0.9**rollout_depth before
-                  comparison, acting as a confidence penalty on speculative
-                  lookahead relative to the node's own depth-0 reward.
-                - 'mean': plain average of UNDISCOUNTED samples, an unbiased
-                  estimate of expected reward. The depth discount is dropped
-                  here (discounting-then-averaging-by-unweighted-n would just
-                  drag the mean toward zero rather than weight confidence).
+            n_rollout: Number of random rollout walks per newly expanded node.
+                These are in ADDITION to the mandatory depth-0 self-evaluation,
+                so a node is aggregated over n_rollout+1 samples. n_rollout=1
+                means one lookahead walk is drawn (n_rollout=0 disables
+                lookahead entirely -> value is just the node's own reward).
+            rollout_aggregation: How to combine a node's reward samples (the
+                depth-0 self-evaluation plus n_rollout walk samples) into its
+                value:
+                - 'max' (default): optimistic maximum - the node's value is
+                  the best reward reachable within rollout_depth random steps.
+                - 'mean': plain average of the samples, an unbiased estimate
+                  of expected reward.
+                Samples are undiscounted in both cases: evaluations here are
+                deterministic (cached energies + DOSCAR lookup), so there is no
+                sampling noise to hedge against.
             search_mode: When the run stops.
                 - 'fast' (default): stop as soon as the ROOT node self-
                   terminates via its visits-without-improvement countdown
@@ -125,7 +128,7 @@ class MCTS(Generic[M]):
         self.exploration_constant = exploration_constant
         self.termination_limit = termination_limit
         self.rollout_depth = rollout_depth
-        self.n_rollout = max(1, n_rollout)
+        self.n_rollout = max(0, n_rollout)
         self.rollout_aggregation = rollout_aggregation
         self.search_mode = search_mode
 
@@ -340,22 +343,27 @@ class MCTS(Generic[M]):
 
     async def _simulate(self, node: SearchNode[M]) -> float:
         """
-        Estimate the value of `node` by aggregating n_rollout reward samples.
+        Estimate the value of `node` by aggregating its reward samples.
 
         Sample 0 always evaluates the node itself (depth 0), records its
         properties, and sets node.own_reward (the node's true material value,
-        which stays independent of aggregation). The remaining n_rollout-1
-        samples are random "max-along-walk" rollouts (see _rollout_sample).
+        which stays independent of aggregation). n_rollout further samples are
+        random "max-along-walk" rollouts (see _rollout_sample), so the node is
+        aggregated over n_rollout+1 samples in total. When rollout_depth == 0
+        the walks are skipped entirely (they could only re-evaluate the node
+        itself), so the value is just node.own_reward.
 
         The samples are combined per self.rollout_aggregation:
-        - 'max': the extra samples are discounted by 0.9**rollout_depth (a
-          confidence penalty on speculative lookahead), then the maximum over
-          all samples is taken.
-        - 'mean': the extra samples are left undiscounted and the plain mean
-          over all samples is returned (unbiased expected-reward estimate).
+        - 'max': the maximum over all samples (the best reward reachable within
+          rollout_depth random steps).
+        - 'mean': the plain mean over all samples (unbiased expected-reward
+          estimate).
+
+        Samples are undiscounted: evaluations are deterministic (cached energies
+        + DOSCAR lookup), so there is no sampling noise to hedge against.
 
         The returned value is what backpropagation propagates; node.own_reward
-        is always the undiscounted depth-0 reward regardless of aggregation.
+        is always the depth-0 reward regardless of aggregation.
         """
         # Depth-0 sample: evaluate the node itself and cache its properties.
         base_props = await self.property_evaluator.evaluate(node.material)
@@ -364,11 +372,13 @@ class MCTS(Generic[M]):
         node.own_reward = own
 
         samples = [own]
-
-        # 'max' discounts the extra samples; 'mean' leaves them undiscounted.
-        scale = 0.9 ** self.rollout_depth if self.rollout_aggregation == "max" else 1.0
-        for _ in range(self.n_rollout - 1):
-            samples.append(scale * await self._rollout_sample(node.material))
+        # With rollout_depth == 0 a walk can take no moves and only re-evaluates
+        # the starting material, returning `own` again - so the walks cannot
+        # change the aggregate. Skip them (rollout_depth == 0 means "no
+        # lookahead," same as n_rollout == 0).
+        if self.rollout_depth > 0:
+            for _ in range(self.n_rollout):
+                samples.append(await self._rollout_sample(node.material))
 
         if self.rollout_aggregation == "max":
             return max(samples)
@@ -388,8 +398,7 @@ class MCTS(Generic[M]):
 
         Rollout samples are NOT added to the tree and do NOT reserve
         identifiers - they only probe reward, so their materials remain
-        available for real expansion later. The depth discount (for 'max'
-        aggregation) is applied by the caller, not here.
+        available for real expansion later.
         """
         current = material
         step_rewards: List[float] = []
