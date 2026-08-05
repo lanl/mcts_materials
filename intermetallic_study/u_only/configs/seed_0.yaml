@@ -7,9 +7,9 @@
 material_type: intermetallic
 
 mcts:
-  iterations: 3000
+  iterations: 1000
   exploration_constant: 1.41  # √2 for balanced exploration/exploitation
-  termination_limit: 200
+  termination_limit: 100
   selection_mode: ucb1
   rollout_depth: 3
   n_rollout: 2
@@ -23,7 +23,7 @@ intermetallic:
   transition_metal: Cr
   group_iv: Sn
   f_block_mode: u_only
-  move_step: 1
+  move_step: 2
   u_bridge: narrow
   rollout_method: ehull_rdos_product
   beta: 1.0
