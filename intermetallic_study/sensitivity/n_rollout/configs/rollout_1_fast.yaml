@@ -1,0 +1,27 @@
+# Sensitivity Study: n_rollout = 1 (fast mode)
+material_type: intermetallic
+mcts:
+  iterations: 1000
+  exploration_constant: 1.41
+  termination_limit: 100
+  selection_mode: ucb1
+  rollout_depth: 3
+  n_rollout: 1
+  rollout_aggregation: max
+  search_mode: fast
+  seed: 0
+  output_dir: results_fast/rollout_1
+intermetallic:
+  structure_path: /Users/blaubach/codex/mcts-materials/examples/mat_Pb6U1W6_sg191.cif
+  transition_metal: Cr
+  group_iv: Sn
+  f_block_mode: u_only
+  move_step: 1
+  u_bridge: narrow
+  rollout_method: ehull_rdos_product
+  beta: 1.0
+  gamma: 1.0
+  doscar_data_path: /Users/blaubach/codex/mcts-materials/doscar_peaks_data_with_U.csv
+  cache_path: /Users/blaubach/codex/mcts-materials/high_throughput_mace_results.full.csv
+  mp_api_key: <use existing>
+molecule: null

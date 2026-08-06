@@ -1,0 +1,35 @@
+# U-Only Product-Mode Study - Seed 0 (Fast Mode)
+#
+# Design space: 108 U-containing compounds (no other f-block)
+# Starting composition: Cr6Sn6U
+# Reward: ehull_rdos_product (r_Ehull × γ·r_DOS, γ=1.0 raw)
+
+material_type: intermetallic
+
+mcts:
+  iterations: 1000
+  exploration_constant: 1.41  # √2 for balanced exploration/exploitation
+  termination_limit: 100
+  selection_mode: ucb1
+  rollout_depth: 3
+  n_rollout: 2
+  rollout_aggregation: max
+  search_mode: fast
+  seed: 0
+  output_dir: intermetallic_study/u_only/results/seed_0_fast
+
+intermetallic:
+  structure_path: examples/mat_Pb6U1W6_sg191.cif
+  transition_metal: Cr
+  group_iv: Sn
+  f_block_mode: u_only
+  move_step: 2
+  u_bridge: narrow
+  rollout_method: ehull_rdos_product
+  beta: 1.0
+  gamma: 1.0  # Raw, unnormalized r_DOS (max in U-only space ≈ 2516)
+
+  # Data paths (adjust if files are elsewhere)
+  doscar_data_path: doscar_peaks_data_with_U.csv
+  cache_path: high_throughput_mace_results.full.csv
+  mp_api_key: null  # Set via MP_API_KEY env var or uncomment to hardcode
