@@ -13,14 +13,13 @@ import pytest
 
 from mcts_framework.intermetallic.doscar import DoscarRewardLookup
 from mcts_framework.intermetallic.rewards import (
-    ehull_reward,
+    EhullRdosProductReward,
+    EhullRdosReward,
     EhullReward,
     RdosReward,
-    EhullRdosReward,
-    EhullRdosProductReward,
     create_intermetallic_reward,
+    ehull_reward,
 )
-
 
 # --- ehull_reward formula ------------------------------------------------
 
@@ -64,6 +63,23 @@ def test_convert_formula_ternary():
     assert lookup.convert_formula_to_doscar_format("W6Pb6U") == "U-Pb-W"
 
 
+def test_convert_formula_recognizes_lanthanum():
+    # Regression: La was missing from the lanthanide set, so La compounds
+    # converted to None and their rDOS was silently 0.0 even when present in
+    # the DOSCAR data. La is the first lanthanide (Z=57) and must be recognized.
+    lookup = DoscarRewardLookup(peaks_file=None)
+    assert lookup.convert_formula_to_doscar_format("Mo6Pb6La") == "La-Pb-Mo"
+
+
+def test_convert_formula_rejects_actinides_beyond_u():
+    # The design space is lanthanides (La-Lu) + U only. Actinides beyond U
+    # (Th, Pa, Np, Pu) are NOT f-block substitution targets here, so a formula
+    # whose only f-block-position element is one of them is not a valid ternary.
+    lookup = DoscarRewardLookup(peaks_file=None)
+    for actinide in ("Th", "Pa", "Np", "Pu"):
+        assert lookup.convert_formula_to_doscar_format(f"W6Pb6{actinide}") is None
+
+
 def test_convert_formula_rejects_non_ternary():
     lookup = DoscarRewardLookup(peaks_file=None)
     assert lookup.convert_formula_to_doscar_format("Fe2O3") is None  # only 2 elems
@@ -105,7 +121,6 @@ def test_rdos_gaussian_sum(tmp_path):
     _write_peaks_csv(p)
     lookup = DoscarRewardLookup(peaks_file=str(p))
 
-    sigma = 0.5
     # Ce-Si-Ti: peak0 (E=0): 10/1 * exp(0) = 10
     #           peak1 (E=0.5): 4/1 * exp(-0.5*(0.5/0.5)^2)=4*exp(-0.5)
     expected_cesiti = 10.0 + 4.0 * np.exp(-0.5)

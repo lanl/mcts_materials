@@ -15,7 +15,7 @@ with sigma = 0.5 eV (physics-informed, not a tunable hyperparameter).
 import logging
 import re
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -29,10 +29,10 @@ _SIGMA = 0.5
 # Element categories for the ternary DOSCAR formula conversion.
 _GROUP_IV = {"Si", "Ge", "Sn", "Pb"}
 _LANTHANIDES = [
-    "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd",
+    "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd",
     "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu",
 ]
-_ACTINIDES = ["Th", "Pa", "U", "Np", "Pu"]
+_ACTINIDES = ["U"]
 _F_BLOCK = set(_LANTHANIDES + _ACTINIDES)
 _TRANSITION_METALS = {
     "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
@@ -50,7 +50,7 @@ class DoscarRewardLookup:
             peaks_file: Path to the raw DOSCAR peaks CSV. If None or missing,
                 all rewards default to 0.0 (with a warning).
         """
-        self.rewards_dict: Dict[str, float] = {}
+        self.rewards_dict: dict[str, float] = {}
 
         if peaks_file is None:
             logger.warning("No DOSCAR peaks file provided; rDOS rewards will be 0.0")
@@ -68,7 +68,7 @@ class DoscarRewardLookup:
             logger.error("Error computing DOSCAR rewards: %s; rDOS = 0.0", exc)
 
     @staticmethod
-    def _compute_rewards(peaks_df: pd.DataFrame) -> Dict[str, float]:
+    def _compute_rewards(peaks_df: pd.DataFrame) -> dict[str, float]:
         """
         Compute the rDOS sum per compound from raw peak rows.
 
@@ -93,7 +93,7 @@ class DoscarRewardLookup:
         ]
         filtered = pd.concat([core, valence_to_include])
 
-        results: Dict[str, float] = {}
+        results: dict[str, float] = {}
         for cname, group in filtered.groupby("COMPOUND_NAME"):
             exp_factor = np.exp(-0.5 * (group["PEAK_ENERGY"] / _SIGMA) ** 2)
             contrib = (group["PEAK_HEIGHT"] / group["PEAK_WIDTH"]) * exp_factor
