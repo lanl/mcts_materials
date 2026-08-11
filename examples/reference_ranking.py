@@ -87,7 +87,8 @@ def _in_fblock(name: str) -> bool:
 def _u_only(name: str) -> bool:
     """True if the formula contains U and no other f-block element."""
     elems = set(re.findall(r"[A-Z][a-z]?", str(name)))
-    return "U" in elems and not (elems & (_F_BLOCK - {"U"}))
+    f_present = elems & _ALL_F_BLOCK
+    return f_present == {"U"}
 
 
 def rank_reference(
