@@ -1,0 +1,32 @@
+# Grid Search: rollout_depth=1, n_rollout=1
+# Design space: 1,620 lanthanide+U compounds
+
+material_type: intermetallic
+
+mcts:
+  iterations: 1000
+  exploration_constant: 1.41
+  termination_limit: 100
+  selection_mode: ucb1
+  rollout_depth: 1
+  n_rollout: 1
+  rollout_aggregation: max
+  search_mode: thorough
+  seed: 0
+  output_dir: intermetallic_study/grid_search/lanthanide_u/results/depth1_nroll1
+
+intermetallic:
+  structure_path: examples/mat_Pb6U1W6_sg191.cif
+  transition_metal: Cr
+  group_iv: Sn
+  f_block_mode: lanthanides_u
+  move_step: 1
+  u_bridge: wide
+  rollout_method: ehull_rdos_product
+  beta: 1.0
+  gamma: 1.0
+
+  # Data paths
+  doscar_data_path: doscar_peaks_data_with_U.csv
+  cache_path: high_throughput_mace_results.full.csv
+  mp_api_key: null
