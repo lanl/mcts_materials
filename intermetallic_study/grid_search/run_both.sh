@@ -41,8 +41,11 @@ if [ "$1" == "--parallel" ]; then
     echo "  - lanthanide_u (PID $LANTHA_PID)"
     echo ""
     echo "Waiting for completion..."
-    wait
 
+    status=0
+    wait "$U_ONLY_PID" || status=$?
+    wait "$LANTHA_PID" || status=$?
+    exit "$status"
     echo ""
     echo "Both grids complete!"
 

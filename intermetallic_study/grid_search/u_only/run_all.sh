@@ -25,18 +25,28 @@ echo "Running all configs in PARALLEL..."
 echo ""
 
 # Launch all configs in parallel
+pids=()
 for config in "$SCRIPT_DIR/configs"/*.yaml; do
     config_name=$(basename "$config" .yaml)
     echo "Launching $config_name..."
     mcts-run run --config "$config" &
+    pids+=($!)
 done
 
 echo ""
 echo "All configs launched. Waiting for completion..."
-wait
+failed=0
+for pid in "${pids[@]}"; do
+    wait "$pid" || failed=1
+done
 
 echo ""
+if [ "$failed" -ne 0 ]; then
+    echo "One or more configs failed." >&2
+    exit 1
+fi
+
 echo "========================================"
 echo "U-Only Grid Search Complete!"
 echo "========================================"
-echo "Results saved in: results/"
+echo "Results are saved under each config's mcts.output_dir."
