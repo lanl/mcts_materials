@@ -270,14 +270,16 @@ class MaceEvaluator(PropertyEvaluator):
                 if 'entries' in doc:
                     # Prioritize r2SCAN, then fall back to GGA variants
                     for run_type in ['r2SCAN', 'GGA+U', 'GGA', 'GGA(+U)']:
-                        if run_type in doc['entries']:
-                            entry_dict = doc['entries'][run_type]
-                            try:
-                                entry_obj = decoder.process_decoded(entry_dict)
-                                if hasattr(entry_obj, 'energy_per_atom'):
-                                    entries.append(entry_obj)
-                            except Exception as e:
-                                logger.debug("Failed to deserialize %s entry: %s", run_type, e)
+                        if run_type not in doc['entries']:
+                            continue
+                        entry_dict = doc['entries'][run_type]
+                        try:
+                            entry_obj = decoder.process_decoded(entry_dict)
+                        except Exception as e:
+                            logger.debug("Failed to deserialize %s entry: %s", run_type, e)
+                            continue
+                        if hasattr(entry_obj, 'energy_per_atom'):
+                            entries.append(entry_obj)
                             break
 
             if not entries:
