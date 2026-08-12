@@ -67,6 +67,13 @@ class MaceEvaluator(PropertyEvaluator):
         # Guards cache_df reads/writes and CSV persistence.
         self._cache_lock = threading.Lock()
 
+        # MP phase diagram cache to avoid redundant API calls
+        self._mp_pd_cache = {}
+
+        # Set up MSONable redirects for r2SCAN compatibility (only needed when
+        # we will be hitting the MP API).
+        if self.mp_api_key:
+            self._setup_msonable_redirects()
         # Load or initialize the formula-keyed CSV cache.
         if cache_path and Path(cache_path).exists():
             self.cache_df = pd.read_csv(cache_path)
@@ -187,6 +194,106 @@ class MaceEvaluator(PropertyEvaluator):
 
     # --- Materials Project decomposition energy --------------------------
 
+    @staticmethod
+    def _setup_msonable_redirects():
+        """Set up MSONable redirects for r2SCAN entry compatibility."""
+        try:
+            import sys
+            import pymatgen.entries
+            import pymatgen.analysis.structure_matcher
+            import pymatgen.entries.compatibility
+            from pymatgen.symmetry import analyzer
+
+            # Add compatibility shims for old module paths
+            class SymmetryUndeterminedError(Exception):
+                pass
+
+            analyzer.SymmetryUndeterminedError = SymmetryUndeterminedError
+            sys.modules['pymatgen.core.entries'] = pymatgen.entries
+            sys.modules['pymatgen.core.structure_matcher'] = pymatgen.analysis.structure_matcher
+            sys.modules['pymatgen.analysis.compatibility'] = pymatgen.entries.compatibility
+
+            # Register MSONable redirects for deserialization
+            from monty.json import MSONable
+
+            if 'pymatgen.core.entries' not in MSONable.REDIRECT:
+                MSONable.REDIRECT['pymatgen.core.entries'] = {}
+
+            MSONable.REDIRECT['pymatgen.core.entries']['ComputedStructureEntry'] = {
+                '@module': 'pymatgen.entries.computed_entries',
+                '@class': 'ComputedStructureEntry'
+            }
+            MSONable.REDIRECT['pymatgen.core.entries']['ComputedEntry'] = {
+                '@module': 'pymatgen.entries.computed_entries',
+                '@class': 'ComputedEntry'
+            }
+        except Exception as exc:
+            logger.warning("Could not set up MSONable redirects: %s", exc)
+
+    def _get_mp_phase_diagram(self, elements: list) -> Optional[object]:
+        """Get MP phase diagram for a chemical system, with caching."""
+        chemsys = "-".join(sorted(elements))
+
+        # Check cache first
+        if chemsys in self._mp_pd_cache:
+            return self._mp_pd_cache[chemsys]
+
+        try:
+            import requests
+            from pymatgen.analysis.phase_diagram import PhaseDiagram
+            from monty.json import MontyDecoder
+
+            url = "https://api.materialsproject.org/materials/thermo/"
+            headers = {"X-API-KEY": self.mp_api_key}
+
+            # Query all subsystems (ternary + binaries + elements)
+            systems_to_query = [chemsys] + elements
+
+            # Add binary combinations for ternary systems
+            if len(elements) == 3:
+                for i in range(len(elements)):
+                    for j in range(i + 1, len(elements)):
+                        binary = "-".join(sorted([elements[i], elements[j]]))
+                        systems_to_query.append(binary)
+
+            all_data = []
+            for sys in systems_to_query:
+                params = {"_fields": "entries", "chemsys": sys}
+                response = requests.get(url, params=params, headers=headers)
+                response.raise_for_status()
+                all_data.extend(response.json()['data'])
+
+            # Deserialize entries with MontyDecoder
+            decoder = MontyDecoder()
+            entries = []
+
+            for doc in all_data:
+                if 'entries' in doc:
+                    # Prioritize r2SCAN, then fall back to GGA variants
+                    for run_type in ['r2SCAN', 'GGA+U', 'GGA', 'GGA(+U)']:
+                        if run_type not in doc['entries']:
+                            continue
+                        entry_dict = doc['entries'][run_type]
+                        try:
+                            entry_obj = decoder.process_decoded(entry_dict)
+                        except Exception as e:
+                            logger.debug("Failed to deserialize %s entry: %s", run_type, e)
+                            continue
+                        if hasattr(entry_obj, 'energy_per_atom'):
+                            entries.append(entry_obj)
+                            break
+
+            if not entries:
+                return None
+
+            pd_obj = PhaseDiagram(entries)
+            self._mp_pd_cache[chemsys] = pd_obj
+            return pd_obj
+
+        except Exception as exc:
+            logger.error("Error building phase diagram for %s: %s", chemsys, exc)
+            return None
+
     def _get_decomposition_energy(self, atoms) -> Tuple[float, str]:
         """Compute e_decomp via MP phase diagram; returns (e_decomp, quality).
 
@@ -197,50 +304,25 @@ class MaceEvaluator(PropertyEvaluator):
             return float("nan"), "no_api_key"
 
         chemical_formula = atoms.get_chemical_formula()
-        element_set = set(atoms.get_chemical_symbols())
+        element_set = sorted(set(atoms.get_chemical_symbols()))
 
         try:
             from pymatgen.core import Composition
-            from pymatgen.io.ase import AseAtomsAdaptor
-            from pymatgen.ext.matproj import MPRester
-            from pymatgen.analysis.phase_diagram import PhaseDiagram
-            from matbench_discovery.energy import get_e_form_per_atom
 
-            with MPRester(self.mp_api_key) as mpr:
-                try:
-                    entries = mpr.get_entries_in_chemsys(
-                        elements=element_set,
-                        additional_criteria={"thermo_types": ["GGA_GGA+U"]},
-                    )
-                except TypeError:
-                    entries = mpr.get_entries_in_chemsys(elements=element_set)
-
-            if not entries:
+            # Get cached phase diagram
+            pd_obj = self._get_mp_phase_diagram(element_set)
+            if pd_obj is None:
                 return 0.0, "no_mp_data"
 
-            pd_obj = PhaseDiagram(entries)
-            decomp = pd_obj.get_decomposition(Composition(chemical_formula))
+            # Compute decomposition
+            comp = Composition(chemical_formula)
+            decomp = pd_obj.get_decomposition(comp)
 
-            calculator = self._get_calculator()
+            # Compute weighted average of formation energies
             total_e_decomp = 0.0
             for entry, fraction in decomp.items():
-                try:
-                    decomp_atoms = AseAtomsAdaptor.get_atoms(
-                        entry.structure, msonable=False
-                    )
-                    if calculator is None:
-                        e_form = entry.energy_per_atom
-                    else:
-                        decomp_atoms.calc = calculator
-                        e_form = get_e_form_per_atom(dict(
-                            energy=decomp_atoms.get_total_energy(),
-                            composition=decomp_atoms.get_chemical_formula(),
-                        ))
-                    total_e_decomp += e_form * fraction
-                except Exception as phase_exc:
-                    logger.error("Decomp phase %s failed: %s",
-                                 entry.composition, phase_exc)
-                    total_e_decomp += entry.energy_per_atom * fraction
+                e_form_entry = pd_obj.get_form_energy_per_atom(entry)
+                total_e_decomp += e_form_entry * fraction
 
             return total_e_decomp, "valid"
 

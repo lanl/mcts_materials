@@ -1,0 +1,30 @@
+# Lanthanide_U Starting Material Sweep: 75th percentile (rank ~1296/1728)
+# Cu6Si6Nd - Reward=-2076.88, E_hull=0.1350
+# Hyperparameters: rollout_depth=1, n_rollout=15
+material_type: intermetallic
+
+mcts:
+  iterations: 1000
+  exploration_constant: 1.41
+  termination_limit: 100
+  selection_mode: ucb1
+  rollout_depth: 1
+  n_rollout: 15
+  rollout_aggregation: max
+  search_mode: thorough
+  seed: 0
+  output_dir: intermetallic_study/sensitivity/starting_material_lanthanide_u_depth1_n15/results/p75_cu_si_nd
+
+intermetallic:
+  structure_path: examples/mat_Pb6U1W6_sg191.cif
+  transition_metal: Cu
+  group_iv: Si
+  f_block_mode: lanthanides_u
+  move_step: 1
+  u_bridge: wide
+  rollout_method: ehull_rdos_product
+  beta: 1.0
+  gamma: 1.0
+  doscar_data_path: doscar_peaks_data_with_U_with_missing.csv
+  cache_path: high_throughput_mace_results.full.csv
+  mp_api_key: <use existing>
