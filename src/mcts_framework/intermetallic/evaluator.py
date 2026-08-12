@@ -70,9 +70,10 @@ class MaceEvaluator(PropertyEvaluator):
         # MP phase diagram cache to avoid redundant API calls
         self._mp_pd_cache = {}
 
-        # Set up MSONable redirects for r2SCAN compatibility
-        self._setup_msonable_redirects()
-
+        # Set up MSONable redirects for r2SCAN compatibility (only needed when
+        # we will be hitting the MP API).
+        if self.mp_api_key:
+            self._setup_msonable_redirects()
         # Load or initialize the formula-keyed CSV cache.
         if cache_path and Path(cache_path).exists():
             self.cache_df = pd.read_csv(cache_path)
