@@ -1,0 +1,37 @@
+# Lanthanide+U Product-Mode Study - Seed 0, move_step=1
+#
+# Design space: 1,620 lanthanide+U compounds (La–Lu + U)
+# Starting composition: Cr6Sn6Tb (Tb instead of U)
+# Reward: ehull_rdos_product (r_Ehull × γ·r_DOS)
+# γ = 0.00039742998860786596 (normalized = 1 / max r_DOS in U-only space)
+# move_step: 1 (more granular exploration than default step=2)
+
+material_type: intermetallic
+
+mcts:
+  iterations: 1000
+  exploration_constant: 1.41  # √2 for balanced exploration/exploitation
+  termination_limit: 100
+  selection_mode: ucb1
+  rollout_depth: 3
+  n_rollout: 2
+  rollout_aggregation: max
+  search_mode: thorough
+  seed: 0
+  output_dir: intermetallic_study/lanthanide_u/results/seed_0_step1
+
+intermetallic:
+  structure_path: examples/mat_Pb6U1W6_sg191.cif
+  transition_metal: Cu
+  group_iv: Sn
+  f_block_mode: lanthanides_u
+  move_step: 1
+  u_bridge: wide
+  rollout_method: ehull_rdos_product
+  beta: 1.0
+  gamma: 1.0  # 1 / 2516.1664410449775 (max r_DOS in U-only)
+
+  # Data paths
+  doscar_data_path: doscar_peaks_data_with_U.csv
+  cache_path: high_throughput_mace_results.full.csv
+  mp_api_key: null

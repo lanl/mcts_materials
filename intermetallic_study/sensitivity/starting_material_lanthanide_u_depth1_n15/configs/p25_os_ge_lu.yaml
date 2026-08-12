@@ -1,6 +1,6 @@
-# Grid Search: rollout_depth=3, n_rollout=5
-# Design space: 1,620 lanthanide+U compounds
-
+# Lanthanide_U Starting Material Sweep: 25th percentile (rank ~432/1728)
+# Os6Ge6Lu - Reward=20.82, E_hull=-0.0021
+# Hyperparameters: rollout_depth=1, n_rollout=15
 material_type: intermetallic
 
 mcts:
@@ -8,25 +8,23 @@ mcts:
   exploration_constant: 1.41
   termination_limit: 100
   selection_mode: ucb1
-  rollout_depth: 3
-  n_rollout: 5
+  rollout_depth: 1
+  n_rollout: 15
   rollout_aggregation: max
   search_mode: thorough
   seed: 0
-  output_dir: intermetallic_study/grid_search/lanthanide_u/results/depth3_nroll5
+  output_dir: intermetallic_study/sensitivity/starting_material_lanthanide_u_depth1_n15/results/p25_os_ge_lu
 
 intermetallic:
   structure_path: examples/mat_Pb6U1W6_sg191.cif
-  transition_metal: Cr
-  group_iv: Sn
+  transition_metal: Os
+  group_iv: Ge
   f_block_mode: lanthanides_u
   move_step: 1
   u_bridge: wide
   rollout_method: ehull_rdos_product
   beta: 1.0
   gamma: 1.0
-
-  # Data paths
   doscar_data_path: doscar_peaks_data_with_U_with_missing.csv
   cache_path: high_throughput_mace_results.full.csv
-  mp_api_key: null
+  mp_api_key: <use existing>

@@ -27,6 +27,6 @@ intermetallic:
   gamma: 1.0
 
   # Data paths
-  doscar_data_path: doscar_peaks_data_with_U.csv
+  doscar_data_path: doscar_peaks_data_with_U_with_missing.csv
   cache_path: high_throughput_mace_results.full.csv
   mp_api_key: null

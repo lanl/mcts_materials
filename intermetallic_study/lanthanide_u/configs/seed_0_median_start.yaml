@@ -1,5 +1,5 @@
-# Grid Search: rollout_depth=3, n_rollout=5
-# Design space: 1,620 lanthanide+U compounds
+# Lanthanide+U Study - Starting from Median Compound (V6Sn6Tm, rank 262)
+# Testing effect of starting position with depth=3, n_rollout=5 config
 
 material_type: intermetallic
 
@@ -13,14 +13,14 @@ mcts:
   rollout_aggregation: max
   search_mode: thorough
   seed: 0
-  output_dir: intermetallic_study/grid_search/lanthanide_u/results/depth3_nroll5
+  output_dir: intermetallic_study/lanthanide_u/results/seed_0_median_start
 
 intermetallic:
   structure_path: examples/mat_Pb6U1W6_sg191.cif
-  transition_metal: Cr
+  transition_metal: V
   group_iv: Sn
   f_block_mode: lanthanides_u
-  move_step: 1
+  move_step: 2
   u_bridge: wide
   rollout_method: ehull_rdos_product
   beta: 1.0
@@ -29,4 +29,4 @@ intermetallic:
   # Data paths
   doscar_data_path: doscar_peaks_data_with_U_with_missing.csv
   cache_path: high_throughput_mace_results.full.csv
-  mp_api_key: null
+  mp_api_key: <use existing>
