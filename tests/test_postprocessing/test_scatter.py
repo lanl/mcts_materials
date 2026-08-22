@@ -68,14 +68,26 @@ class TestPlotEhullVsRdos:
         assert not ax.spines["right"].get_visible()
 
     def test_ymax_caps_axis_else_shows_outliers(self, tmp_path):
-        # Default: full range shows the E_hull~10 penalty outliers.
+        # Default (no ymax): the axis autoscales to show the full backdrop,
+        # including its highest-E_hull points. Assert the top spans the actual
+        # data max rather than a hard-coded threshold, since the design-space
+        # cache's max E_hull depends on the (embargoed) data file.
         full = plot_ehull_vs_rdos(_run_df(), str(tmp_path / "full.png"),
                                   _make_config(), top_n=3)
-        assert full.axes[0].get_ylim()[1] > 5  # autoscaled above the outlier
-        # ymax caps the view for the tight publication look.
+        ax = full.axes[0]
+        data_ymax = max(
+            float(coll.get_offsets()[:, 1].max())
+            for coll in ax.collections
+            if len(coll.get_offsets())
+        )
+        assert ax.get_ylim()[1] >= data_ymax  # nothing clipped; autoscaled to fit
+        # ymax caps the view for the tight publication look. Use a cap below the
+        # data max so capping is observable regardless of the data's range.
+        cap = data_ymax / 2.0
         capped = plot_ehull_vs_rdos(_run_df(), str(tmp_path / "cap.png"),
-                                    _make_config(), top_n=3, ymax=1.5)
-        assert capped.axes[0].get_ylim()[1] == 1.5
+                                    _make_config(), top_n=3, ymax=cap)
+        assert capped.axes[0].get_ylim()[1] == cap
+        assert ax.get_ylim()[1] > cap  # uncapped view extends above the cap
 
     def test_overlay_has_topn_points(self, tmp_path):
         fig = plot_ehull_vs_rdos(_run_df(), str(tmp_path / "s.png"),
