@@ -5,6 +5,7 @@ Configuration is split into:
     - MCTSConfig          : material-agnostic search hyperparameters
     - IntermetallicConfig : crystal-structure-specific settings
     - MoleculeConfig      : molecule-specific settings
+    - SuperhydrideConfig  : ternary-superhydride settings
     - Config              : top-level wrapper selecting the material type
 
 Configs load from YAML or JSON and validate on construction, so a bad run
@@ -204,6 +205,207 @@ class IntermetallicConfig(BaseModel):
         return self
 
 
+#: Host-element palettes for the superhydride search. See
+#: mcts_framework.superhydride.elements for the element sets behind each.
+HostPalette = Literal["electropositive", "covalent", "high_tc", "all"]
+
+
+class QuantumEspressoConfig(BaseModel):
+    """
+    Quantum ESPRESSO settings for computing the ELF descriptors on demand.
+
+    The numerical fields are the scientific protocol, not tuning knobs: two
+    networking values computed at different cutoffs, meshes or pseudopotential
+    families are not a comparison. Recording them in the config is what makes a
+    campaign reproducible, so they live here rather than being hard-coded.
+    """
+
+    # --- Pseudopotentials ---
+    pseudo_dir: Optional[str] = Field(
+        None,
+        description="Directory of UPF files. Falls back to the ESPRESSO_PSEUDO "
+        "environment variable. Never mix pseudopotential families within a set "
+        "of numbers meant to be compared.",
+    )
+    pseudo_files: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Explicit element -> UPF filename map; unlisted elements "
+        "default to '<Element>.upf'",
+    )
+
+    # --- Where the binaries are ---
+    bin_dir: Optional[str] = Field(
+        None,
+        description="Directory holding pw.x / pp.x / projwfc.x. Falls back to "
+        "the QE_BIN_DIR environment variable, then to PATH.",
+    )
+    mpi_command: str = Field("mpirun", description="MPI launcher; empty runs serially")
+    ranks: int = Field(
+        4,
+        ge=1,
+        description="Maximum MPI ranks. Clamped per structure to the FFT plane "
+        "count, since ranks that get no planes abort the run.",
+    )
+    environment_setup: Optional[str] = Field(
+        None,
+        description="Shell snippet sourced before each binary, for clusters "
+        "where the toolchain lives behind modules (e.g. 'module load "
+        "gcc/13.2.0 openmpi/4.1.6'). Falls back to QE_ENV_SETUP.",
+    )
+    timeout_s: float = Field(7200.0, gt=0, description="Wall-clock limit per QE step")
+
+    # --- Protocol ---
+    ecutwfc: float = Field(90.0, gt=0, description="Plane-wave cutoff (Ry)")
+    ecutrho: float = Field(
+        360.0,
+        gt=0,
+        description="Charge-density cutoff (Ry). 4x ecutwfc is exact for "
+        "norm-conserving pseudopotentials; ultrasoft and PAW need 8-12x.",
+    )
+    degauss: float = Field(0.02, gt=0, description="Smearing width (Ry)")
+    conv_thr: float = Field(1e-10, gt=0, description="SCF convergence threshold (Ry)")
+    kspacing_scf: float = Field(
+        0.2262, gt=0, description="k-point spacing for SCF (1/A, 2*pi convention)"
+    )
+    kspacing_nscf: float = Field(
+        0.1131, gt=0, description="k-point spacing for NSCF (1/A, 2*pi convention)"
+    )
+
+    pressure_gpa: Optional[float] = Field(
+        None,
+        description="Target pressure for the relaxation. Required when relax is "
+        "true: a pressure-stabilised hydride relaxed to 0 GPa is a different "
+        "material.",
+    )
+    relax: bool = Field(True, description="vc-relax each candidate before the SCF")
+    relax_passes: int = Field(
+        2,
+        ge=1,
+        description="vc-relax passes. 2 is the minimum that sheds the Pulay "
+        "error in the stress; a single pass can be 100+ kbar out.",
+    )
+
+    # --- I/O ---
+    work_root: str = Field(
+        "qe_runs",
+        description="Parent directory for per-candidate run directories. Put it "
+        "on scratch - the funnel writes wavefunctions and cubes.",
+    )
+    cache_path: Optional[str] = Field(
+        None,
+        description="CSV of computed descriptors, in the descriptor-table "
+        "schema, so an interrupted campaign resumes and a finished one can be "
+        "replayed with descriptor_table_path.",
+    )
+    keep_scratch: bool = Field(False, description="Keep each candidate's QE scratch dir")
+    keep_cube: bool = Field(
+        False,
+        description="Keep the ELF cubes. Tens of megabytes each; a campaign "
+        "that keeps every one fills a filesystem before it finishes.",
+    )
+
+    model_config = {"extra": "forbid"}
+
+    @model_validator(mode="after")
+    def _resolve_environment(self) -> "QuantumEspressoConfig":
+        # Cluster paths belong in the environment, not in a shareable config.
+        if not self.pseudo_dir:
+            self.pseudo_dir = os.environ.get("ESPRESSO_PSEUDO")
+        if not self.bin_dir:
+            self.bin_dir = os.environ.get("QE_BIN_DIR")
+        if not self.environment_setup:
+            self.environment_setup = os.environ.get("QE_ENV_SETUP")
+
+        if not self.pseudo_dir:
+            raise ValueError(
+                "Quantum ESPRESSO needs a pseudopotential directory: set "
+                "pseudo_dir in the config or export ESPRESSO_PSEUDO"
+            )
+        if self.relax and self.pressure_gpa is None:
+            raise ValueError(
+                "relax=true requires pressure_gpa. Relaxing a "
+                "pressure-stabilised hydride with no target relaxes it to "
+                "0 GPa, which is a different material."
+            )
+        return self
+
+
+class SuperhydrideConfig(BaseModel):
+    """
+    Ternary superhydride search settings.
+
+    The search substitutes the non-hydrogen (host) sublattice of the template
+    at structure_path, scoring candidates by the ELF-based Tc fit (Belli et
+    al., Ann. Phys. 2025, 537, e00280, Eq. 2). Stability is not scored.
+    """
+
+    structure_path: str = Field(
+        ..., description="Path to the starting hydride template (CIF)"
+    )
+
+    host_palette: HostPalette = Field(
+        "high_tc",
+        description=(
+            "Which elements a host site may take: electropositive (alkali, "
+            "alkaline earth, rare earth, early transition metals, Al, Th/U); "
+            "covalent (p-block elements forming X-H bonds); high_tc (the union "
+            "of the two classes that reach high Tc, default); all (adds late "
+            "transition metals, which give low-Tc interstitial hydrides)"
+        ),
+    )
+
+    preserve_distinct_hosts: bool = Field(
+        True,
+        description=(
+            "Drop substitutions that would make two host species identical, "
+            "keeping a ternary ternary. Set False to let the search collapse "
+            "onto the binary hydrides a template contains."
+        ),
+    )
+
+    evaluator: Literal["table", "quantum_espresso"] = Field(
+        "table",
+        description=(
+            "Where the ELF descriptors come from: 'table' reads them from "
+            "descriptor_table_path (fast, and the search runs without a DFT "
+            "stack); 'quantum_espresso' computes them per candidate by running "
+            "the ground-state funnel."
+        ),
+    )
+
+    descriptor_table_path: Optional[str] = Field(
+        None,
+        description=(
+            "CSV of precomputed ELF descriptors with columns "
+            "formula, phi, phi_star, h_dos. Compositions absent from it score "
+            "0.0, so a run with no table only enumerates the search space."
+        ),
+    )
+
+    quantum_espresso: Optional[QuantumEspressoConfig] = Field(
+        None, description="Required when evaluator='quantum_espresso'"
+    )
+
+    normalize_reward: bool = Field(
+        True,
+        description=(
+            "Divide the Tc estimate by its analytic maximum (427.7 K) so "
+            "rewards land in (0, 1]. Ranking is unchanged; set False for raw "
+            "kelvin and retune exploration_constant by ~2 orders of magnitude."
+        ),
+    )
+
+    model_config = {"extra": "forbid"}
+
+    @model_validator(mode="after")
+    def _check_evaluator_requirements(self) -> "SuperhydrideConfig":
+        if self.evaluator == "quantum_espresso" and self.quantum_espresso is None:
+            raise ValueError(
+                "evaluator='quantum_espresso' requires a 'quantum_espresso' section"
+            )
+        return self
+
+
 class MoleculeConfig(BaseModel):
     """Molecule search settings."""
 
@@ -240,10 +442,11 @@ class MoleculeConfig(BaseModel):
 class Config(BaseModel):
     """Top-level configuration selecting a material type and its settings."""
 
-    material_type: Literal["intermetallic", "molecule"]
+    material_type: Literal["intermetallic", "molecule", "superhydride"]
     mcts: MCTSConfig = Field(default_factory=MCTSConfig)
     intermetallic: Optional[IntermetallicConfig] = None
     molecule: Optional[MoleculeConfig] = None
+    superhydride: Optional[SuperhydrideConfig] = None
 
     model_config = {"extra": "forbid"}
 
@@ -256,6 +459,10 @@ class Config(BaseModel):
         if self.material_type == "molecule" and self.molecule is None:
             raise ValueError(
                 "material_type='molecule' requires a 'molecule' section"
+            )
+        if self.material_type == "superhydride" and self.superhydride is None:
+            raise ValueError(
+                "material_type='superhydride' requires a 'superhydride' section"
             )
         return self
 

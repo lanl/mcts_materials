@@ -47,6 +47,13 @@ molecule = [
     "rdkit>=2023.0",
 ]
 
+# Ternary superhydride support (ELF descriptors + host substitution)
+superhydride = [
+    "ase>=3.22",
+    "spglib>=2.0",
+    "scipy>=1.10",
+]
+
 # Visualization and analysis
 viz = [
     "matplotlib>=3.7",
@@ -66,7 +73,7 @@ dev = [
 
 # Install everything
 all = [
-    "mcts-framework[intermetallic,molecule,viz,dev]"
+    "mcts-framework[intermetallic,molecule,superhydride,viz,dev]"
 ]
 
 [project.scripts]
@@ -84,11 +91,14 @@ packages = [
     "mcts_framework.core",
     "mcts_framework.intermetallic",
     "mcts_framework.molecule",
+    "mcts_framework.superhydride",
+    "mcts_framework.superhydride.qe",
     "mcts_framework.cli",
     "mcts_framework.postprocessing",
 ]
-# Note: intermetallic and molecule import their heavy deps (ase/mace/pymatgen,
-# rdkit/molecule-modifier) lazily; the core stays lightweight.
+# Note: intermetallic, molecule and superhydride import their heavy deps
+# (ase/mace/pymatgen, rdkit/molecule-modifier, ase/spglib/scipy) lazily; the
+# core stays lightweight.
 package-dir = {"" = "src"}
 
 [tool.setuptools.package-data]

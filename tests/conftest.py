@@ -96,3 +96,58 @@ def simple_material():
 def simple_materials():
     """Create multiple simple test materials."""
     return [SimpleMaterial(f"material_{i}") for i in range(5)]
+
+
+# --- Superhydride template builder ---------------------------------------
+#
+# Structures for the superhydride tests are built programmatically so that
+# suite needs no data files. ASE is imported inside the builder, not at module
+# scope, so the tests that need no structures still run without it.
+#
+# These live here rather than in a tests/test_superhydride/conftest.py because
+# `tests` is not an importable package: a second conftest.py would be bound to
+# the same module name and shadow this one (which test_cli imports by name).
+
+
+def build_superhydride_template(host_a: str = "La", host_b: str = "Be", a: float = 5.0):
+    """
+    Return an ASE Atoms for a synthetic cubic XYH8 cell.
+
+    Host A sits at the corner, host B at the body centre, and eight hydrogens
+    at the (1/4, 3/4)^3 positions around them. This is the shape of a ternary
+    superhydride template - two distinct host sites and a hydrogen sublattice -
+    not a physical claim about any particular compound.
+    """
+    from ase import Atoms
+
+    positions = [(0.0, 0.0, 0.0), (0.5, 0.5, 0.5)]
+    symbols = [host_a, host_b]
+    for x in (0.25, 0.75):
+        for y in (0.25, 0.75):
+            for z in (0.25, 0.75):
+                positions.append((x, y, z))
+                symbols.append("H")
+    return Atoms(symbols=symbols, scaled_positions=positions, cell=[a, a, a], pbc=True)
+
+
+@pytest.fixture
+def make_superhydride_template():
+    """The template builder itself, for tests that need several compositions."""
+    return build_superhydride_template
+
+
+@pytest.fixture
+def make_superhydride_structure():
+    """Factory returning a SuperhydrideStructure for a given host pair."""
+    from mcts_framework.superhydride import SuperhydrideStructure
+
+    def _make(host_a: str = "La", host_b: str = "Be", a: float = 5.0):
+        return SuperhydrideStructure(build_superhydride_template(host_a, host_b, a))
+
+    return _make
+
+
+@pytest.fixture
+def superhydride_template(make_superhydride_structure):
+    """The default LaBeH8-shaped template."""
+    return make_superhydride_structure()
