@@ -8,6 +8,7 @@ e00280 (Equation 2). Stability is not part of the reward at this stage.
     SuperhydrideStructure     the material (ASE Atoms + crystallographic id)
     HostSubstitutionMoves     the expansion rule (one host swap per move)
     DescriptorTableEvaluator  phi / phi* / H_DOS from a precomputed table
+    QuantumEspressoEvaluator  the same descriptors computed with QE (qe/)
     TcReward                  Eq. 2, optionally normalised to (0, 1]
 
 (c) 2026. Triad National Security, LLC. All rights reserved.

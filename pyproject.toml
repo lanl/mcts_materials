@@ -92,6 +92,7 @@ packages = [
     "mcts_framework.intermetallic",
     "mcts_framework.molecule",
     "mcts_framework.superhydride",
+    "mcts_framework.superhydride.qe",
     "mcts_framework.cli",
     "mcts_framework.postprocessing",
 ]

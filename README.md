@@ -16,7 +16,8 @@ material type plug in through four small interfaces.
     `mcts_crystal` codebase).
   - **Ternary superhydrides** — host-sublattice substitution on a hydride
     template, scored by the ELF-based Tc estimator (networking value φ,
-    molecularity index φ\*, hydrogen fraction and H-projected DOS).
+    molecularity index φ\*, hydrogen fraction and H-projected DOS). Descriptors
+    come from a precomputed table or from Quantum ESPRESSO on demand.
   - **Molecules** — functional-group substitution via `molecule-modifier`,
     ML property prediction (melting point, H₂ capacity, synthesizability).
 - **Four selection strategies** — UCB1, PUCT, ε-greedy, Boltzmann.
@@ -196,6 +197,7 @@ mcts_materials/          # repo root
 │   ├── core/           # Material-agnostic: interfaces, SearchNode, selection, MCTS, config
 │   ├── intermetallic/  # Crystal structures, periodic-table moves, MACE/MP evaluator, rewards
 │   ├── superhydride/   # Hydride templates, host substitution, ELF descriptors, Tc reward
+│   │   └── qe/         # Quantum ESPRESSO ground-state funnel for those descriptors
 │   ├── molecule/       # RDKit structures, functional-group moves, ML evaluator, rewards
 │   ├── viz/            # Analysis (metrics/report) and plots (convergence/tree/distribution)
 │   ├── postprocessing/ # Regenerate study outputs from a run: tables, scatter, radial tree, driver
@@ -259,6 +261,25 @@ real estimate since the fit cannot return less than 5.5 K.
 
 **Stability is deliberately not scored.** Screening the survivors for
 thermodynamic and dynamic stability is a separate, later step.
+
+**Where the descriptors come from.** `evaluator: table` reads φ, φ\* and H_DOS
+from a CSV (`formula,phi,phi_star,h_dos`), so the search runs with no DFT stack
+at all; compositions absent from it score 0.0, which makes a table-less run a
+cheap enumeration of what is worth computing. `evaluator: quantum_espresso`
+computes them per candidate by running
+
+```
+[vc-relax ×2] → scf → nscf → pp.x (ELF cube) → projwfc.x (projected DOS)
+```
+
+Three things that subpackage refuses to leave to chance, because each produces
+numbers rather than errors: `JOB DONE.` gates every step (pw.x exits 0 on
+several genuine failures); each candidate gets its own working directory *and*
+`outdir` (concurrent runs sharing one read each other's wavefunctions); and
+`vc-relax` runs twice, because the plane-wave basis is defined on the cell the
+run *started* from, so a single pass can declare convergence while its stress
+is 100+ kbar out. Its CSV cache is written in the descriptor-table schema, so a
+finished campaign replays as a `descriptor_table_path`.
 
 **Expansion**: one move substitutes *one* host species for a chemically
 adjacent element (same group ±1 period, same period ±1 atomic number — which

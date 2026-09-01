@@ -169,9 +169,48 @@ def _build_superhydride(config: Config) -> Tuple[object, object, "PropertyEvalua
         palette=sc.host_palette,
         preserve_distinct_hosts=sc.preserve_distinct_hosts,
     )
-    evaluator = DescriptorTableEvaluator(table_path=sc.descriptor_table_path)
+
+    if sc.evaluator == "quantum_espresso":
+        evaluator = _build_qe_evaluator(sc.quantum_espresso)
+    else:
+        evaluator = DescriptorTableEvaluator(table_path=sc.descriptor_table_path)
+
     reward = create_superhydride_reward(normalize=sc.normalize_reward)
     return root, moves, evaluator, reward
+
+
+def _build_qe_evaluator(qc: object) -> "PropertyEvaluator":
+    """Assemble the Quantum ESPRESSO evaluator from config.superhydride.quantum_espresso."""
+    from ..superhydride.qe import QERunner, QESettings, QuantumEspressoEvaluator
+
+    settings = QESettings(
+        ecutwfc=qc.ecutwfc,
+        ecutrho=qc.ecutrho,
+        degauss=qc.degauss,
+        conv_thr=qc.conv_thr,
+        kspacing_scf=qc.kspacing_scf,
+        kspacing_nscf=qc.kspacing_nscf,
+        pseudo_dir=qc.pseudo_dir,
+        pseudo_files=dict(qc.pseudo_files),
+    )
+    runner = QERunner(
+        bin_dir=qc.bin_dir or "",
+        mpi_command=qc.mpi_command,
+        ranks=qc.ranks,
+        environment_setup=qc.environment_setup,
+        timeout_s=qc.timeout_s,
+    )
+    return QuantumEspressoEvaluator(
+        settings,
+        runner,
+        work_root=qc.work_root,
+        pressure_gpa=qc.pressure_gpa,
+        relax=qc.relax,
+        relax_passes=qc.relax_passes,
+        cache_path=qc.cache_path,
+        keep_scratch=qc.keep_scratch,
+        keep_cube=qc.keep_cube,
+    )
 
 
 def _build_molecule(config: Config) -> Tuple[object, object, "PropertyEvaluator", "RewardFunction"]:
