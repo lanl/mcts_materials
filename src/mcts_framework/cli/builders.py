@@ -39,6 +39,8 @@ def build_mcts(config: Config) -> MCTS:
         root, moves, evaluator, reward = _build_intermetallic(config)
     elif config.material_type == "molecule":
         root, moves, evaluator, reward = _build_molecule(config)
+    elif config.material_type == "superhydride":
+        root, moves, evaluator, reward = _build_superhydride(config)
     else:  # pragma: no cover - Config validation prevents this
         raise ValueError(f"Unsupported material_type: {config.material_type!r}")
 
@@ -136,6 +138,39 @@ def _build_intermetallic(config: Config) -> Tuple[object, object, "PropertyEvalu
         beta=ic.beta,
         gamma=ic.gamma,
     )
+    return root, moves, evaluator, reward
+
+
+def _build_superhydride(config: Config) -> Tuple[object, object, "PropertyEvaluator", "RewardFunction"]:
+    """Assemble superhydride components from config.superhydride."""
+    import warnings
+
+    from ase.io import read
+
+    from ..superhydride import (
+        DescriptorTableEvaluator,
+        HostSubstitutionMoves,
+        SuperhydrideStructure,
+        create_superhydride_reward,
+        elements,
+    )
+
+    sc = config.superhydride
+    atoms = read(sc.structure_path)
+
+    # Validate the template against the palette now that the CIF is loaded.
+    # Raises if the structure is not a hydride or has no movable host site;
+    # softer problems (a frozen host, a binary template) come back as warnings.
+    for msg in elements.validate_hosts(atoms.get_atomic_numbers(), sc.host_palette):
+        warnings.warn(msg, UserWarning)
+
+    root = SuperhydrideStructure(atoms)
+    moves = HostSubstitutionMoves(
+        palette=sc.host_palette,
+        preserve_distinct_hosts=sc.preserve_distinct_hosts,
+    )
+    evaluator = DescriptorTableEvaluator(table_path=sc.descriptor_table_path)
+    reward = create_superhydride_reward(normalize=sc.normalize_reward)
     return root, moves, evaluator, reward
 
 

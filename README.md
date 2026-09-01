@@ -10,10 +10,13 @@ material type plug in through four small interfaces.
 - **Material-agnostic core** — the MCTS algorithm knows nothing about
   chemistry; it operates on abstract `Material` / `MoveGenerator` /
   `PropertyEvaluator` / `RewardFunction` interfaces.
-- **Two built-in material types**
+- **Three built-in material types**
   - **Intermetallic crystals** — periodic-table element substitution, MACE +
     Materials Project energies, DOSCAR rDOS rewards (ported from the validated
     `mcts_crystal` codebase).
+  - **Ternary superhydrides** — host-sublattice substitution on a hydride
+    template, scored by the ELF-based Tc estimator (networking value φ,
+    molecularity index φ\*, hydrogen fraction and H-projected DOS).
   - **Molecules** — functional-group substitution via `molecule-modifier`,
     ML property prediction (melting point, H₂ capacity, synthesizability).
 - **Four selection strategies** — UCB1, PUCT, ε-greedy, Boltzmann.
@@ -60,6 +63,7 @@ are the same either way:
 | --- | --- | --- |
 | _(none)_ | numpy, pandas, pydantic, pyyaml, tqdm, typer | core + `rdos`-only runs + tests |
 | `intermetallic` | ASE, spglib, MACE, pymatgen, matbench-discovery | `ehull*` rollout methods |
+| `superhydride` | ASE, spglib, scipy | superhydride search |
 | `molecule` | RDKit (+ molecule-modifier, installed separately) | molecule search |
 | `viz` | matplotlib, seaborn, networkx | plots + `mcts-run figures` |
 | `dev` | pytest, ruff, black, mypy | running the test suite |
@@ -70,6 +74,7 @@ are the same either way:
 ```bash
 pip install -e .                      # core only
 pip install -e ".[intermetallic]"     # + intermetallic support
+pip install -e ".[superhydride]"      # + superhydride support
 pip install -e ".[molecule]"          # + molecule support
 pip install -e ".[viz]"               # + visualization
 pip install -e ".[all]"               # everything + dev tools
@@ -102,6 +107,7 @@ mcts-run validate --config examples/config_intermetallic.yaml
 
 # Run a search:
 mcts-run run --config examples/config_intermetallic.yaml
+mcts-run run --config examples/config_superhydride.yaml
 mcts-run run --config examples/config_molecule.yaml
 ```
 
@@ -189,6 +195,7 @@ mcts_materials/          # repo root
 ├── src/mcts_framework/
 │   ├── core/           # Material-agnostic: interfaces, SearchNode, selection, MCTS, config
 │   ├── intermetallic/  # Crystal structures, periodic-table moves, MACE/MP evaluator, rewards
+│   ├── superhydride/   # Hydride templates, host substitution, ELF descriptors, Tc reward
 │   ├── molecule/       # RDKit structures, functional-group moves, ML evaluator, rewards
 │   ├── viz/            # Analysis (metrics/report) and plots (convergence/tree/distribution)
 │   ├── postprocessing/ # Regenerate study outputs from a run: tables, scatter, radial tree, driver
@@ -205,6 +212,10 @@ mcts_materials/          # repo root
 - **Intermetallics**: identifier is `<formula>|SG<number>|<Wyckoff-decoration>`
   (via spglib), so different site decorations at equal composition never
   collide, and atom reordering is irrelevant.
+- **Superhydrides**: same `<formula>|SG<number>|<Wyckoff-decoration>` scheme.
+  The decoration matters here: an XYH8 template has two distinct host sites, so
+  swapping which host occupies which site is a different material at identical
+  composition and space group.
 - **Molecules**: identifier is the RDKit canonical SMILES.
 - The tree reserves a material's identifier **only when it is attached** as a
   child; a candidate generated but not yet attached stays available to whoever
@@ -220,6 +231,46 @@ material and its reward are always self-consistent.
 ### Preserved physics
 The intermetallic rewards preserve the validated constants from `mcts_crystal`:
 `ehull_reward = -tanh(120·(E_hull − 0.05))` and rDOS Gaussian width σ = 0.5 eV.
+
+### Superhydride reward and expansion rule
+The reward is Equation 2 of Belli, Torres, Contreras-García and Zurek,
+*Ann. Phys. (Berlin)* **2025**, 537, e00280 — a symbolic-regression fit over
+244 binary and ternary hydrides (RMSE 41 K, MAE 31 K, max deviation 108 K):
+
+```
+Tc = 422.2 · (27/4) · (φ*² − φ*³) · H_f³ · (φ·H_DOS)^⅓ + 5.5   [K]
+```
+
+- `φ` **networking value** — highest ELF isovalue whose isosurface spans the
+  crystal in all three directions.
+- `φ*` **molecularity index** — highest ELF isovalue at which two hydrogen
+  atoms connect.
+- `H_f` hydrogen fraction; `H_DOS` hydrogen share of the DOS at E_F.
+
+The `27/4` normalises `(φ*² − φ*³)` to 1 at its peak `φ* = 2/3` (the paper
+quotes the empirical optimum at 0.68), so 422.2 K is the entire dynamic range
+and the fit is **bounded to [5.5, 427.7] K**. `normalize_reward` (default) maps
+that onto (0, 1] by dividing by 427.7 — a monotone rescaling that leaves the
+ranking alone but keeps rewards O(1), which `exploration_constant` assumes.
+The fit is monotone in φ, H_f and H_DOS but **not** in φ*: pushing φ* past 2/3
+towards 1 *lowers* Tc, because intact H₂ molecules put their states away from
+E_F. Candidates whose descriptors are missing score 0.0, which is below any
+real estimate since the fit cannot return less than 5.5 K.
+
+**Stability is deliberately not scored.** Screening the survivors for
+thermodynamic and dynamic stability is a separate, later step.
+
+**Expansion**: one move substitutes *one* host species for a chemically
+adjacent element (same group ±1 period, same period ±1 atomic number — which
+walks the lanthanide chain and its Ba/Hf ends — plus the ±32 Ln↔An analog
+moves), leaving the hydrogen sublattice and the template untouched. This is the
+process the paper describes for the ternary datasets themselves: "once an
+optimal template is discovered, new structures are generated via atomic
+substitution of elements with similar chemistries in a given supercell."
+Branching is the **sum** over host sites rather than the product, so tree depth
+measures chemical distance from the starting composition. Because H_f is fixed
+by the template and Tc scales as H_f³, **choosing the template chooses the
+ceiling**.
 
 ### Search behavior (matches current `mcts_crystal`)
 - **`move_step`** (intermetallic): max positions a substitution may jump along
