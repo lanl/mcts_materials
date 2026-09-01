@@ -5,6 +5,7 @@ Configuration is split into:
     - MCTSConfig          : material-agnostic search hyperparameters
     - IntermetallicConfig : crystal-structure-specific settings
     - MoleculeConfig      : molecule-specific settings
+    - SuperhydrideConfig  : ternary-superhydride settings
     - Config              : top-level wrapper selecting the material type
 
 Configs load from YAML or JSON and validate on construction, so a bad run
@@ -204,6 +205,65 @@ class IntermetallicConfig(BaseModel):
         return self
 
 
+#: Host-element palettes for the superhydride search. See
+#: mcts_framework.superhydride.elements for the element sets behind each.
+HostPalette = Literal["electropositive", "covalent", "high_tc", "all"]
+
+
+class SuperhydrideConfig(BaseModel):
+    """
+    Ternary superhydride search settings.
+
+    The search substitutes the non-hydrogen (host) sublattice of the template
+    at structure_path, scoring candidates by the ELF-based Tc fit (Belli et
+    al., Ann. Phys. 2025, 537, e00280, Eq. 2). Stability is not scored.
+    """
+
+    structure_path: str = Field(
+        ..., description="Path to the starting hydride template (CIF)"
+    )
+
+    host_palette: HostPalette = Field(
+        "high_tc",
+        description=(
+            "Which elements a host site may take: electropositive (alkali, "
+            "alkaline earth, rare earth, early transition metals, Al, Th/U); "
+            "covalent (p-block elements forming X-H bonds); high_tc (the union "
+            "of the two classes that reach high Tc, default); all (adds late "
+            "transition metals, which give low-Tc interstitial hydrides)"
+        ),
+    )
+
+    preserve_distinct_hosts: bool = Field(
+        True,
+        description=(
+            "Drop substitutions that would make two host species identical, "
+            "keeping a ternary ternary. Set False to let the search collapse "
+            "onto the binary hydrides a template contains."
+        ),
+    )
+
+    descriptor_table_path: Optional[str] = Field(
+        None,
+        description=(
+            "CSV of precomputed ELF descriptors with columns "
+            "formula, phi, phi_star, h_dos. Compositions absent from it score "
+            "0.0, so a run with no table only enumerates the search space."
+        ),
+    )
+
+    normalize_reward: bool = Field(
+        True,
+        description=(
+            "Divide the Tc estimate by its analytic maximum (427.7 K) so "
+            "rewards land in (0, 1]. Ranking is unchanged; set False for raw "
+            "kelvin and retune exploration_constant by ~2 orders of magnitude."
+        ),
+    )
+
+    model_config = {"extra": "forbid"}
+
+
 class MoleculeConfig(BaseModel):
     """Molecule search settings."""
 
@@ -240,10 +300,11 @@ class MoleculeConfig(BaseModel):
 class Config(BaseModel):
     """Top-level configuration selecting a material type and its settings."""
 
-    material_type: Literal["intermetallic", "molecule"]
+    material_type: Literal["intermetallic", "molecule", "superhydride"]
     mcts: MCTSConfig = Field(default_factory=MCTSConfig)
     intermetallic: Optional[IntermetallicConfig] = None
     molecule: Optional[MoleculeConfig] = None
+    superhydride: Optional[SuperhydrideConfig] = None
 
     model_config = {"extra": "forbid"}
 
@@ -256,6 +317,10 @@ class Config(BaseModel):
         if self.material_type == "molecule" and self.molecule is None:
             raise ValueError(
                 "material_type='molecule' requires a 'molecule' section"
+            )
+        if self.material_type == "superhydride" and self.superhydride is None:
+            raise ValueError(
+                "material_type='superhydride' requires a 'superhydride' section"
             )
         return self
 

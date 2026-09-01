@@ -1,0 +1,65 @@
+# Example configuration: ternary superhydride search by estimated Tc.
+#
+# Run with:
+#   mcts-run run --config examples/config_superhydride.yaml
+#
+# The reward is the ELF-based Tc fit of Belli et al., Ann. Phys. (Berlin) 2025,
+# 537, e00280, Eq. 2 - no stability term at this stage. It needs four
+# descriptors per candidate: phi, phi* (from an ELF cube), H_DOS (from a
+# projected DOS) and H_f (free, from the composition).
+#
+# TWO FILES YOU MUST SUPPLY:
+#
+#   structure_path        A relaxed hydride template (CIF) with two distinct
+#                         host sites - the search substitutes its non-hydrogen
+#                         sublattice and leaves the hydrogen motif alone. This
+#                         choice sets the ceiling: Tc scales as H_f^3, and H_f
+#                         is fixed by the template.
+#
+#   descriptor_table_path A CSV of precomputed descriptors:
+#
+#                             formula,phi,phi_star,h_dos
+#                             LaBeH8,0.527,0.738,0.724
+#                             CaH6,0.811,0.811,0.793
+#
+#                         Compositions absent from it score 0.0, so a first run
+#                         with no table just enumerates which compositions the
+#                         search wants computed. Compute those with DFT, extend
+#                         the table, and run again.
+#
+# Needs only the [superhydride] extra (ase, spglib, scipy) - no API keys.
+
+material_type: superhydride
+
+mcts:
+  iterations: 1000
+  exploration_constant: 0.1     # assumes O(1) rewards; see normalize_reward
+  termination_limit: 60
+  selection_mode: ucb1          # ucb1 | puct | epsilon_greedy | boltzmann
+  rollout_depth: 1
+  n_rollout: 5
+  rollout_aggregation: max      # max (optimistic, best reachable) | mean
+  search_mode: fast             # fast (stop at convergence) | thorough
+  seed: 0
+  output_dir: mcts_results_superhydride
+
+superhydride:
+  structure_path: path/to/your_template.cif
+
+  host_palette: high_tc         # high_tc (electropositive + covalent, the two
+                                #   classes that reach high Tc - default)
+                                # | electropositive (alkali, alkaline earth,
+                                #   rare earth, early TMs, Al, Th/U)
+                                # | covalent (p-block X-H formers)
+                                # | all (adds late TMs -> low-Tc interstitial
+                                #   hydrides; mostly wasted evaluations)
+
+  preserve_distinct_hosts: true # keep a ternary ternary; false lets the search
+                                # collapse onto the binary hydrides it contains
+
+  normalize_reward: true        # Tc / 427.7 K -> reward in (0, 1]. Ranking is
+                                # unchanged. Set false for raw kelvin, and then
+                                # raise exploration_constant by ~2 orders of
+                                # magnitude or the search goes greedy.
+
+  descriptor_table_path: null   # CSV: formula,phi,phi_star,h_dos
